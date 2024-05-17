@@ -4,14 +4,15 @@
 #include "HAL/PlatformFileManager.h"
 #include <Misc/FileHelper.h>
 
-void UFileWidget::OpenFilePicker()
+FString UFileWidget::OpenFilePicker()
 {
-	// Get the platform-specific file dialog
+	// Assuming use of Unreal's desktop platform module to open a file dialog
+	FString FilePath;
 	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
-	if (DesktopPlatform != nullptr && GetWorld() != nullptr)
+	if (DesktopPlatform)
 	{
 		TArray<FString> OutFiles;
-		bool bFileSelected = DesktopPlatform->OpenFileDialog(
+		bool bOpened = DesktopPlatform->OpenFileDialog(
 			nullptr,
 			TEXT("Select a file"),
 			FPaths::ProjectDir(),
@@ -21,23 +22,11 @@ void UFileWidget::OpenFilePicker()
 			OutFiles
 		);
 
-		if (bFileSelected && OutFiles.Num() > 0)
+		if (bOpened && OutFiles.Num() > 0)
 		{
-			// Call the upload function if a file is selected
-			//UploadFile(OutFiles[0]);
-			SelectedFilePath = OutFiles[0];
+			FilePath = OutFiles[0];
 		}
 	}
-}
 
-void UFileWidget::UploadFile(const FString& FilePath) const
-{
-	if (CesiumDataUploader != nullptr)
-	{
-		CesiumDataUploader->UploadToCesiumIon(FilePath, TEXT("Your Access Token Here"));
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("CesiumIonUploader reference not set in the blueprint."));
-	}
+	return FilePath;
 }

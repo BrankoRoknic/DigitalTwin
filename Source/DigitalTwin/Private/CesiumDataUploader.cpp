@@ -12,12 +12,11 @@ UCesiumDataUploader::UCesiumDataUploader()
 {
 	// Constructor code, if any specific initialization is required
 }
-
 void UCesiumDataUploader::UploadToCesiumIon(const FString& FilePath, const FString& AccessToken)
 {
 	FHttpModule* Http = &FHttpModule::Get();
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
-	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumDataUploader::OnUploadComplete);
+	Request->OnProcessRequestComplete().BindStatic(&UCesiumDataUploader::OnUploadComplete);
 	Request->SetURL(TEXT("https://api.cesium.com/v1/assets"));
 	Request->SetVerb(TEXT("POST"));
 	Request->SetHeader(TEXT("Authorization"), FString(TEXT("Bearer ")) + AccessToken);
@@ -25,11 +24,16 @@ void UCesiumDataUploader::UploadToCesiumIon(const FString& FilePath, const FStri
 
 	// Load the file data
 	TArray<uint8> FileData;
-	FFileHelper::LoadFileToArray(FileData, *FilePath);
-	Request->SetContent(FileData);
-
-	// Send the request
-	Request->ProcessRequest();
+	if (FFileHelper::LoadFileToArray(FileData, *FilePath))
+	{
+		Request->SetContent(FileData);
+		// Send the request
+		Request->ProcessRequest();
+	} 
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to load file: %s"), *FilePath);
+	}
 }
 
 void UCesiumDataUploader::OnUploadComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)

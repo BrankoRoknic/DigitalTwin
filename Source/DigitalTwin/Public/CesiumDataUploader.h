@@ -17,8 +17,8 @@ class DIGITALTWIN_API UCesiumDataUploader : public UObject
 
 public:
 	UFUNCTION(BlueprintCallable, Category="Cesium Ion")
-	void UploadToCesiumIon(const FString& FilePath, const FString& AccessToken);
+	static void UploadToCesiumIon(const FString& FilePath, const FString& AccessToken);
 
 private:
-	void OnUploadComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
+	static void OnUploadComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
 };
