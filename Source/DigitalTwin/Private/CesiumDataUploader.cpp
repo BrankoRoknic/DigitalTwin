@@ -6,7 +6,6 @@
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Misc/FileHelper.h"
-#include "HAL/PlatformFileManager.h"
 
 UCesiumDataUploader::UCesiumDataUploader()
 {
