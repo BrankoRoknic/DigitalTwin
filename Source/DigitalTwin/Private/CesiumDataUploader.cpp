@@ -16,12 +16,24 @@ void UCesiumDataUploader::UploadToCesiumIon(const FString& FilePath, const FStri
 {
     FString FileExtension = FPaths::GetExtension(FilePath).ToLower();
     FString FileType;
+    FString SourceType;
 
-    // Map file extensions to their respective types
-    if (FileExtension == TEXT("las")) FileType = TEXT("LAS");
-    else if (FileExtension == TEXT("laz")) FileType = TEXT("LAZ");
-    else if (FileExtension == TEXT("obj")) FileType = TEXT("3DTILES");
-    else if (FileExtension == TEXT("kmz")) FileType = TEXT("KMZ");
+    // Map file extensions to their respective types and source types
+    if (FileExtension == TEXT("las") || FileExtension == TEXT("laz"))
+    {
+        FileType = TEXT("3DTILES");
+        SourceType = TEXT("POINT_CLOUD");
+    }
+    else if (FileExtension == TEXT("obj"))
+    {
+        FileType = TEXT("3DTILES");
+        SourceType = TEXT("3D_MODEL");
+    }
+    else if (FileExtension == TEXT("kmz"))
+    {
+        FileType = TEXT("KML");
+        SourceType = TEXT("KML");
+    }
     else
     {
         UE_LOG(LogTemp, Error, TEXT("Unsupported file type: %s"), *FileExtension);
@@ -34,37 +46,14 @@ void UCesiumDataUploader::UploadToCesiumIon(const FString& FilePath, const FStri
     Request->SetURL(TEXT("https://api.cesium.com/v1/assets"));
     Request->SetVerb(TEXT("POST"));
     Request->SetHeader(TEXT("Authorization"), FString(TEXT("Bearer ")) + AccessToken);
-    Request->SetHeader(TEXT("Content-Type"), TEXT("multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW"));
+    Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
 
-    TArray<uint8> FileData;
-    if (FFileHelper::LoadFileToArray(FileData, *FilePath))
-    {
-        FString Boundary = TEXT("----WebKitFormBoundary7MA4YWxkTrZu0gW");
-        FString BeginBoundary = TEXT("--") + Boundary + TEXT("\r\n");
-        FString EndBoundary = TEXT("--") + Boundary + TEXT("--\r\n");
+    FString JsonPayload = FString::Printf(TEXT("{\"name\": \"%s\", \"description\": \"Uploaded via Unreal Engine\", \"type\": \"%s\", \"options\": {\"sourceType\": \"%s\"}}"), *FPaths::GetCleanFilename(FilePath), *FileType, *SourceType);
+    Request->SetContentAsString(JsonPayload);
 
-        FString BodyData;
-        BodyData += BeginBoundary;
-        BodyData += TEXT("Content-Disposition: form-data; name=\"type\"\r\n\r\n");
-        BodyData += FileType + TEXT("\r\n");
-        BodyData += BeginBoundary;
-        BodyData += TEXT("Content-Disposition: form-data; name=\"file\"; filename=\"") + FPaths::GetCleanFilename(FilePath) + TEXT("\"\r\n");
-        BodyData += TEXT("Content-Type: application/octet-stream\r\n\r\n");
-
-        TArray<uint8> RequestContent;
-        RequestContent.Append(reinterpret_cast<const uint8*>(TCHAR_TO_UTF8(*BodyData)), BodyData.Len());
-        RequestContent.Append(FileData);
-        RequestContent.Append(reinterpret_cast<const uint8*>(TCHAR_TO_UTF8(*EndBoundary)), EndBoundary.Len());
-
-        Request->SetContent(RequestContent);
-
-        Request->ProcessRequest();
-    }
-    else
-    {
-        UE_LOG(LogTemp, Error, TEXT("Failed to load file: %s"), *FilePath);
-    }
+    Request->ProcessRequest();
 }
+
 void UCesiumDataUploader::OnUploadComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
 {
     if (!bWasSuccessful || !Response.IsValid())
