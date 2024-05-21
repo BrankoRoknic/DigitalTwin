@@ -1,13 +1,10 @@
 #include "FileWidget.h"
 #include "DesktopPlatformModule.h"
-#include "CesiumDataUploader.h"
 #include "HAL/PlatformFileManager.h"
 #include <Misc/FileHelper.h>
 
-FString UFileWidget::OpenFilePicker()
+void UFileWidget::OpenFilePicker(FString& OutFilePath)
 {
-	// Assuming use of Unreal's desktop platform module to open a file dialog
-	FString FilePath;
 	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
 	if (DesktopPlatform)
 	{
@@ -24,9 +21,15 @@ FString UFileWidget::OpenFilePicker()
 
 		if (bOpened && OutFiles.Num() > 0)
 		{
-			FilePath = OutFiles[0];
+			OutFilePath = OutFiles[0];
+		}
+		else
+		{
+			OutFilePath = TEXT("");
 		}
 	}
-
-	return FilePath;
+	else
+	{
+		OutFilePath = TEXT("");
+	}
 }

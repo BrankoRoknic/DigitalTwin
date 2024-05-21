@@ -1,9 +1,10 @@
 #pragma once
-
+#include "Misc/Paths.h"
 #include "CoreMinimal.h"
-#include "CesiumDataUploader.h"
 #include "Blueprint/UserWidget.h"
 #include "FileWidget.generated.h"
+
+
 
 /**
  * 
@@ -16,5 +17,5 @@ class DIGITALTWIN_API UFileWidget : public UUserWidget
 public:
 	// Static function to open the file dialog and get the file path
 	UFUNCTION(BlueprintCallable, Category = "File Picker")
-	static FString OpenFilePicker();
+	static void OpenFilePicker(FString& OutFilePath);
 };
