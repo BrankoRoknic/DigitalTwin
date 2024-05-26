@@ -10,7 +10,8 @@ public class DigitalTwin : ModuleRules
 
 		PublicDependencyModuleNames.AddRange(new[]
 		{
-			"Core", "CoreUObject", "Engine", "InputCore", "HTTP", "UMG"
+			"Core", "CoreUObject", "Engine", "InputCore", "HTTP", "UMG", "Json",
+			"JsonUtilities"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new[]
@@ -19,7 +20,9 @@ public class DigitalTwin : ModuleRules
 			"CoreUObject",
 			"Engine",
 			"InputCore",
-			"HTTP" // Include Http module
+			"HTTP", // Include Http module
+			"Json",
+			"JsonUtilities"
 		});
 
 		// Uncomment if you are using Slate UI
