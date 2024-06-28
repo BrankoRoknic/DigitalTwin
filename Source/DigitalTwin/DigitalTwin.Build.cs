@@ -11,8 +11,9 @@ public class DigitalTwin : ModuleRules
 		PublicDependencyModuleNames.AddRange(new[]
 		{
 			"Core", "CoreUObject", "Engine", "InputCore", "HTTP", "UMG", "Json",
-			"JsonUtilities"
+			"JsonUtilities", "AWSSDK"
 		});
+		bEnableUndefinedIdentifierWarnings = false;
 
 		PrivateDependencyModuleNames.AddRange(new[]
 		{
@@ -22,7 +23,8 @@ public class DigitalTwin : ModuleRules
 			"InputCore",
 			"HTTP", // Include Http module
 			"Json",
-			"JsonUtilities"
+			"JsonUtilities",
+			"AWSSDK"
 		});
 
 		// Uncomment if you are using Slate UI
