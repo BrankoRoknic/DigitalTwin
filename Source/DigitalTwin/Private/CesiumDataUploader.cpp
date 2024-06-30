@@ -1,14 +1,18 @@
-    #include "CesiumDataUploader.h"
-    #include "HttpModule.h"
-    #include "Interfaces/IHttpRequest.h"
-    #include "Interfaces/IHttpResponse.h"
-    #include "Misc/FileHelper.h"
-    #include "Dom/JsonObject.h"
-    #include "Serialization/JsonSerializer.h"
+#pragma warning(disable: 4668)
+#include "CesiumDataUploader.h"
+#include "HttpModule.h"
+#include "Dom/JsonObject.h"
+#include "Interfaces/IHttpRequest.h"
+#include "Interfaces/IHttpResponse.h"
+#include "Misc/FileHelper.h"
+#include "Serialization/JsonSerializer.h"
 #include <aws/core/Aws.h>
 #include <aws/core/auth/AWSCredentialsProvider.h>
+#include <aws/core/client/ClientConfiguration.h>
 #include <aws/s3/S3Client.h>
-#include <aws/s3/model/PutObjectRequest.h>>
+#include <aws/s3/model/PutObjectRequest.h>
+
+
 UCesiumDataUploader::UCesiumDataUploader()
 : CurrentFilePath(TEXT("")), CurrentAccessToken(TEXT("")), CurrentAssetId(TEXT("")) // Initialize member variables
 {
@@ -62,7 +66,7 @@ void UCesiumDataUploader::UploadToCesiumIon(const FString& FilePath, const FStri
         Request->SetVerb(TEXT("POST"));
         Request->SetHeader(TEXT("Authorization"), FString(TEXT("Bearer ")) + AccessToken);
         Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-
+ 
         FString JsonPayload = FString::Printf(TEXT("{\"name\": \"%s\", \"description\": \"Uploaded via Unreal Engine\", \"type\": \"%s\", \"options\": {\"sourceType\": \"%s\"}}"), *FPaths::GetCleanFilename(FilePath), *FileType, *SourceType);
         Request->SetContentAsString(JsonPayload);
 
@@ -118,7 +122,7 @@ void UCesiumDataUploader::UploadFileToS3(const FString& FilePath, const FString&
         return;
     }
 
-    Aws::Client::ClientConfiguration ClientConfig;
+    Aws::S3::S3ClientConfiguration ClientConfig;
     ClientConfig.endpointOverride = TCHAR_TO_UTF8(*Endpoint);
 
     auto CredentialsProvider = Aws::MakeShared<Aws::Auth::SimpleAWSCredentialsProvider>(
@@ -128,7 +132,7 @@ void UCesiumDataUploader::UploadFileToS3(const FString& FilePath, const FString&
         TCHAR_TO_UTF8(*SessionToken)
     );
 
-    Aws::S3::S3Client S3Client(CredentialsProvider, ClientConfig);
+    Aws::S3::S3Client S3Client(CredentialsProvider, nullptr, ClientConfig);
 
     Aws::S3::Model::PutObjectRequest ObjectRequest;
     ObjectRequest.SetBucket(TCHAR_TO_UTF8(*Bucket));

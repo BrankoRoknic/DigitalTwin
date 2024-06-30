@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using UnrealBuildTool;
 
@@ -38,7 +39,8 @@ public class AWSSDK : ModuleRules
         // AWS SDK relies on certain identifiers being undefined, so this produces warnings
         // Unreal engine treats certain warnings as errors and fails the build
         // this line will disable those warnings:
-        bEnableUndefinedIdentifierWarnings = false;
+       // 
+       bEnableUndefinedIdentifierWarnings = false;
 
         // Dynamically linking to the SDK requires us to define the
         // USE_IMPORT_EXPORT symbol for all build targets using the
@@ -46,6 +48,7 @@ public class AWSSDK : ModuleRules
         PublicDefinitions.Add("USE_IMPORT_EXPORT");
         PublicDefinitions.Add("AWS_CRT_CPP_USE_IMPORT_EXPORT");
 
+        
 
         if (Target.Platform == UnrealTargetPlatform.Win64)
         {

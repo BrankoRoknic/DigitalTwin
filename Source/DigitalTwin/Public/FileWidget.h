@@ -17,5 +17,5 @@ class DIGITALTWIN_API UFileWidget : public UUserWidget
 public:
 	// Static function to open the file dialog and get the file path
 	UFUNCTION(BlueprintCallable, Category = "File Picker")
-	static void OpenFilePicker(FString& OutFilePath);
+	static FString OpenFilePicker();
 };

@@ -3,8 +3,10 @@
 #include "HAL/PlatformFileManager.h"
 #include <Misc/FileHelper.h>
 
-void UFileWidget::OpenFilePicker(FString& OutFilePath)
+FString UFileWidget::OpenFilePicker()
 {
+	// Assuming use of Unreal's desktop platform module to open a file dialog
+	FString FilePath;
 	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
 	if (DesktopPlatform)
 	{
@@ -21,15 +23,9 @@ void UFileWidget::OpenFilePicker(FString& OutFilePath)
 
 		if (bOpened && OutFiles.Num() > 0)
 		{
-			OutFilePath = OutFiles[0];
-		}
-		else
-		{
-			OutFilePath = TEXT("");
+			FilePath = OutFiles[0];
 		}
 	}
-	else
-	{
-		OutFilePath = TEXT("");
-	}
+
+	return FilePath;
 }
