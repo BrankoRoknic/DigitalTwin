@@ -1,4 +1,5 @@
 #pragma once
+
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "Interfaces/IHttpRequest.h"
@@ -11,7 +12,6 @@ class DIGITALTWIN_API UCesiumDataUploader : public UObject
 
 public:
 	UCesiumDataUploader();
-	~UCesiumDataUploader();
 
 	UFUNCTION(BlueprintCallable, Category = "Cesium Ion")
 	void UploadToCesiumIon(const FString& FilePath, const FString& AccessToken);
