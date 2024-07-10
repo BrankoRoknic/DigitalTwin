@@ -1,9 +1,14 @@
 #include "CesiumDataUploader.h"
 #include "HttpModule.h"
+#include "aws/core/Aws.h"
+#include "aws/core/auth/AWSCredentials.h"
+#include "aws/s3/S3Client.h"
+#include "aws/s3/model/PutObjectRequest.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Misc/FileHelper.h"
 #include "Dom/JsonObject.h"
+#include <aws/core/utils/memory/stl/AWSStringStream.h>
 #include "Serialization/JsonSerializer.h"
 
 UCesiumDataUploader::UCesiumDataUploader()
@@ -69,54 +74,70 @@ void UCesiumDataUploader::OnCreateAssetMetadataComplete(FHttpRequestPtr Request,
 
     if (ResponseCode >= 200 && ResponseCode < 300)
     {
-        UE_LOG(LogTemp, Log, TEXT("Asset metadata created: %s"), *ResponseContent);
-
-        // Parse the JSON response to get upload details
         TSharedPtr<FJsonObject> JsonObject;
         TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ResponseContent);
-        if (FJsonSerializer::Deserialize(Reader, JsonObject))
-        {
-            FString Endpoint = JsonObject->GetStringField("uploadLocation.endpoint");
-            FString Bucket = JsonObject->GetStringField("uploadLocation.bucket");
-            FString Prefix = JsonObject->GetStringField("uploadLocation.prefix");
-            FString AccessKey = JsonObject->GetStringField("uploadLocation.accessKey");
-            FString SecretAccessKey = JsonObject->GetStringField("uploadLocation.secretAccessKey");
-            FString SessionToken = JsonObject->GetStringField("uploadLocation.sessionToken");
-            CurrentAssetId = JsonObject->GetObjectField("assetMetadata")->GetStringField("id");
 
-            // Proceed to upload the file to S3
+        if (FJsonSerializer::Deserialize(Reader, JsonObject) && JsonObject.IsValid())
+        {
+            FString Endpoint = JsonObject->GetObjectField("uploadLocation")->GetStringField("endpoint");
+            FString Bucket = JsonObject->GetObjectField("uploadLocation")->GetStringField("bucket");
+            FString Prefix = JsonObject->GetObjectField("uploadLocation")->GetStringField("prefix");
+            FString AccessKey = JsonObject->GetObjectField("uploadLocation")->GetStringField("accessKey");
+            FString SecretAccessKey = JsonObject->GetObjectField("uploadLocation")->GetStringField("secretAccessKey");
+            FString SessionToken = JsonObject->GetObjectField("uploadLocation")->GetStringField("sessionToken");
+
             UploadFileToS3(CurrentFilePath, Endpoint, Bucket, Prefix, AccessKey, SecretAccessKey, SessionToken);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Error, TEXT("Failed to parse JSON response."));
         }
     }
     else
     {
-        UE_LOG(LogTemp, Error, TEXT("Asset metadata creation failed: %s. HTTP Status Code: %d"), *ResponseContent, ResponseCode);
+        UE_LOG(LogTemp, Error, TEXT("Asset metadata creation failed: HTTP Status Code: %d"), ResponseCode);
     }
 }
 
 void UCesiumDataUploader::UploadFileToS3(const FString& FilePath, const FString& Endpoint, const FString& Bucket, const FString& Prefix, const FString& AccessKey, const FString& SecretAccessKey, const FString& SessionToken)
 {
-    // Load the file data
     TArray<uint8> FileData;
-    if (!FFileHelper::LoadFileToArray(FileData, *FilePath))
-    {
+    if (!FFileHelper::LoadFileToArray(FileData, *FilePath)) {
         UE_LOG(LogTemp, Error, TEXT("Failed to load file: %s"), *FilePath);
         return;
     }
 
-    FString Url = FString::Printf(TEXT("%s/%s/%s%s"), *Endpoint, *Bucket, *Prefix, *FPaths::GetCleanFilename(FilePath));
-    
-    TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
-    Request->SetURL(Url);
-    Request->SetVerb(TEXT("PUT"));
-    Request->SetHeader(TEXT("Content-Type"), TEXT("application/octet-stream"));
-    Request->SetHeader(TEXT("x-amz-security-token"), SessionToken);
-    Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("AWS4-HMAC-SHA256 Credential=%s/20230520/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-acl;x-amz-content-sha256;x-amz-date, Signature=%s"), *AccessKey, *SecretAccessKey));
-    Request->SetContent(FileData);
+    Aws::SDKOptions options;
+    Aws::InitAPI(options);
 
-    Request->OnProcessRequestComplete().BindUObject(this, &UCesiumDataUploader::OnS3UploadComplete);
-    Request->ProcessRequest();
+    Aws::Client::ClientConfiguration clientConfig;
+    clientConfig.region = Aws::Region::US_EAST_1;
+    clientConfig.endpointOverride = TCHAR_TO_UTF8(*Endpoint);
+
+    Aws::Auth::AWSCredentials credentials(TCHAR_TO_UTF8(*AccessKey), TCHAR_TO_UTF8(*SecretAccessKey), TCHAR_TO_UTF8(*SessionToken));
+
+    Aws::S3::S3Client s3_client(credentials, NULL,clientConfig);
+
+    Aws::S3::Model::PutObjectRequest object_request;
+    object_request.WithBucket(TCHAR_TO_UTF8(*Bucket))
+                  .WithKey(TCHAR_TO_UTF8(*FPaths::Combine(Prefix, FPaths::GetCleanFilename(FilePath))))
+                  .SetContentType("application/octet-stream");
+
+    auto DataStream = Aws::MakeShared<Aws::StringStream>("");
+    DataStream->write(reinterpret_cast<char*>(FileData.GetData()), FileData.Num());
+    object_request.SetBody(DataStream);
+
+    auto put_object_outcome = s3_client.PutObject(object_request);
+
+    if (put_object_outcome.IsSuccess()) {
+        UE_LOG(LogTemp, Log, TEXT("Successfully uploaded to S3"));
+    } else {
+        UE_LOG(LogTemp, Error, TEXT("Failed to upload to S3: %hs"), UTF8_TO_TCHAR(put_object_outcome.GetError().GetMessage().c_str()));
+    }
+
+    Aws::ShutdownAPI(options);
 }
+
 
 void UCesiumDataUploader::OnS3UploadComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
 {

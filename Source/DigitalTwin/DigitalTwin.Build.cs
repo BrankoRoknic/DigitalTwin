@@ -11,8 +11,9 @@ public class DigitalTwin : ModuleRules
 		PublicDependencyModuleNames.AddRange(new[]
 		{
 			"Core", "CoreUObject", "Engine", "InputCore", "HTTP", "UMG", "Json",
-			"JsonUtilities"
+			"JsonUtilities", "AWSSDK"
 		});
+		bEnableUndefinedIdentifierWarnings = false;
 
 		PrivateDependencyModuleNames.AddRange(new[]
 		{
