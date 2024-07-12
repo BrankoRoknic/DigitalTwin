@@ -1,8 +1,21 @@
 #pragma once
+#ifdef CESIUMDATAUPLOADER_EXPORTS
+#define CESIUMDATAUPLOADER_API __declspec(dllexport)
+#else
+#define CESIUMDATAUPLOADER_API __declspec(dllimport)
+#endif
+#include "AWSSDK/Include/aws/core/Aws.h"
+#include "AWSSDK/Include/aws/core/auth/AWSCredentials.h"
+#include "AWSSDK/Include/aws/s3/S3Client.h"
+#include "AWSSDK/Include/aws/s3/model/PutObjectRequest.h"
+#include "Interfaces/IHttpRequest.h"
+#include "Interfaces/IHttpResponse.h"
+#include "Misc/FileHelper.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonSerializer.h"
 #include "CoreMinimal.h"
 #include "HttpModule.h"
 #include "Dom/JsonObject.h"
-#include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Misc/FileHelper.h"

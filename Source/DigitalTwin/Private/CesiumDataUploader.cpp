@@ -1,15 +1,10 @@
+#ifdef CESIUMDATAUPLOADER_EXPORTS
+#define CESIUMDATAUPLOADER_API __declspec(dllexport)
+#else
+#define CESIUMDATAUPLOADER_API __declspec(dllimport)
+#endif
 #include "CesiumDataUploader.h"
-#include "HttpModule.h"
-#include "aws/core/Aws.h"
-#include "aws/core/auth/AWSCredentials.h"
-#include "aws/s3/S3Client.h"
-#include "aws/s3/model/PutObjectRequest.h"
-#include "Interfaces/IHttpRequest.h"
-#include "Interfaces/IHttpResponse.h"
-#include "Misc/FileHelper.h"
-#include "Dom/JsonObject.h"
-#include <aws/core/utils/memory/stl/AWSStringStream.h>
-#include "Serialization/JsonSerializer.h"
+
 
 UCesiumDataUploader::UCesiumDataUploader()
 {
@@ -65,42 +60,56 @@ void UCesiumDataUploader::OnCreateAssetMetadataComplete(FHttpRequestPtr Request,
 {
     if (!bWasSuccessful || !Response.IsValid())
     {
-        UE_LOG(LogTemp, Error, TEXT("Asset metadata creation failed."));
+        UE_LOG(LogTemp, Error, TEXT("Asset metadata creation failed due to an invalid response or a network error."));
         return;
     }
 
     int32 ResponseCode = Response->GetResponseCode();
+    if (ResponseCode < 200 || ResponseCode >= 300)
+    {
+        FString ResponseContent = Response->GetContentAsString();
+        UE_LOG(LogTemp, Error, TEXT("Asset metadata creation failed with HTTP Status Code: %d and response: %s"), ResponseCode, *ResponseContent);
+        return;
+    }
+
     FString ResponseContent = Response->GetContentAsString();
+    UE_LOG(LogTemp, Log, TEXT("Asset metadata created: %s"), *ResponseContent);
 
-    if (ResponseCode >= 200 && ResponseCode < 300)
+    TSharedPtr<FJsonObject> JsonObject;
+    TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ResponseContent);
+    if (!FJsonSerializer::Deserialize(Reader, JsonObject) || !JsonObject.IsValid())
     {
-        TSharedPtr<FJsonObject> JsonObject;
-        TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ResponseContent);
-
-        if (FJsonSerializer::Deserialize(Reader, JsonObject) && JsonObject.IsValid())
-        {
-            FString Endpoint = JsonObject->GetObjectField("uploadLocation")->GetStringField("endpoint");
-            FString Bucket = JsonObject->GetObjectField("uploadLocation")->GetStringField("bucket");
-            FString Prefix = JsonObject->GetObjectField("uploadLocation")->GetStringField("prefix");
-            FString AccessKey = JsonObject->GetObjectField("uploadLocation")->GetStringField("accessKey");
-            FString SecretAccessKey = JsonObject->GetObjectField("uploadLocation")->GetStringField("secretAccessKey");
-            FString SessionToken = JsonObject->GetObjectField("uploadLocation")->GetStringField("sessionToken");
-
-            UploadFileToS3(CurrentFilePath, Endpoint, Bucket, Prefix, AccessKey, SecretAccessKey, SessionToken);
-        }
-        else
-        {
-            UE_LOG(LogTemp, Error, TEXT("Failed to parse JSON response."));
-        }
+        UE_LOG(LogTemp, Error, TEXT("Failed to parse JSON response."));
+        return;
     }
-    else
+  
+    const TSharedPtr<FJsonObject>* UploadLocationObject;
+    if (!JsonObject->TryGetObjectField(TEXT("uploadLocation"), UploadLocationObject))
     {
-        UE_LOG(LogTemp, Error, TEXT("Asset metadata creation failed: HTTP Status Code: %d"), ResponseCode);
+        UE_LOG(LogTemp, Error, TEXT("Failed to locate 'uploadLocation' in JSON response."));
+        return;
     }
+
+    FString Endpoint = (*UploadLocationObject)->GetStringField(TEXT("endpoint"));
+    FString Bucket = (*UploadLocationObject)->GetStringField(TEXT("bucket"));
+    FString Prefix = (*UploadLocationObject)->GetStringField(TEXT("prefix"));
+    FString AccessKey = (*UploadLocationObject)->GetStringField(TEXT("accessKey"));
+    FString SecretAccessKey = (*UploadLocationObject)->GetStringField(TEXT("secretAccessKey"));
+    FString SessionToken = (*UploadLocationObject)->GetStringField(TEXT("sessionToken"));
+    FString AssetId = JsonObject->GetObjectField(TEXT("assetMetadata"))->GetStringField(TEXT("id"));
+    
+
+    UploadFileToS3(CurrentFilePath, Endpoint, Bucket, Prefix, AccessKey, SecretAccessKey, SessionToken);
 }
+
 
 void UCesiumDataUploader::UploadFileToS3(const FString& FilePath, const FString& Endpoint, const FString& Bucket, const FString& Prefix, const FString& AccessKey, const FString& SecretAccessKey, const FString& SessionToken)
 {
+    UE_LOG(LogTemp, Log, TEXT("endpoint: %s"), *Endpoint);
+    UE_LOG(LogTemp, Log, TEXT("Bucket: %s"), *Bucket);
+    UE_LOG(LogTemp, Log, TEXT("AccessKey: %s"), *AccessKey);
+    UE_LOG(LogTemp, Log, TEXT("SecretAccessKey: %s"), *SecretAccessKey);
+    
     TArray<uint8> FileData;
     if (!FFileHelper::LoadFileToArray(FileData, *FilePath)) {
         UE_LOG(LogTemp, Error, TEXT("Failed to load file: %s"), *FilePath);
@@ -137,7 +146,6 @@ void UCesiumDataUploader::UploadFileToS3(const FString& FilePath, const FString&
 
     Aws::ShutdownAPI(options);
 }
-
 
 void UCesiumDataUploader::OnS3UploadComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
 {

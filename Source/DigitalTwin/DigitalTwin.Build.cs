@@ -1,5 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+using System.IO;
 using UnrealBuildTool;
 
 public class DigitalTwin : ModuleRules
@@ -11,8 +12,9 @@ public class DigitalTwin : ModuleRules
 		PublicDependencyModuleNames.AddRange(new[]
 		{
 			"Core", "CoreUObject", "Engine", "InputCore", "HTTP", "UMG", "Json",
-			"JsonUtilities", "AWSSDK"
+			"JsonUtilities", "AWSSDK", "AWSPlugin"
 		});
+
 		bEnableUndefinedIdentifierWarnings = false;
 
 		PrivateDependencyModuleNames.AddRange(new[]
@@ -24,7 +26,9 @@ public class DigitalTwin : ModuleRules
 			"HTTP", // Include Http module
 			"Json",
 			"JsonUtilities"
+			, "AWSSDK",
 		});
+		
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
