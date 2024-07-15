@@ -1,13 +1,9 @@
 #pragma once
 #ifdef CESIUMDATAUPLOADER_EXPORTS
-#define CESIUMDATAUPLOADER_API __declspec(dllexport)
+#define CESIUMDATAUPLOADER __declspec(dllexport)
 #else
-#define CESIUMDATAUPLOADER_API __declspec(dllimport)
+#define CESIUMDATAUPLOADER __declspec(dllimport)
 #endif
-#include "AWSSDK/Include/aws/core/Aws.h"
-#include "AWSSDK/Include/aws/core/auth/AWSCredentials.h"
-#include "AWSSDK/Include/aws/s3/S3Client.h"
-#include "AWSSDK/Include/aws/s3/model/PutObjectRequest.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Misc/FileHelper.h"
@@ -30,7 +26,6 @@ class DIGITALTWIN_API UCesiumDataUploader : public UObject
 
 public:
 	UCesiumDataUploader();
-	//~UCesiumDataUploader();
 
 	UFUNCTION(BlueprintCallable, Category = "Cesium Ion")
 	void UploadToCesiumIon(const FString& FilePath, const FString& AccessToken);

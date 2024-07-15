@@ -20,6 +20,8 @@ public class AWSSDK : ModuleRules
         "aws-cpp-sdk-access-management",
         "aws-cpp-sdk-cognito-identity",
         "aws-cpp-sdk-core",
+        "aws-cpp-sdk-transfer",
+        "aws-cpp-sdk-s3",
         "aws-cpp-sdk-iam",
         "aws-cpp-sdk-kinesis",
         "aws-crt-cpp",

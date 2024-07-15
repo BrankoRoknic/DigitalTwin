@@ -1,10 +1,8 @@
-#ifdef CESIUMDATAUPLOADER_EXPORTS
-#define CESIUMDATAUPLOADER_API __declspec(dllexport)
-#else
-#define CESIUMDATAUPLOADER_API __declspec(dllimport)
-#endif
 #include "CesiumDataUploader.h"
-
+#include <aws/core/Aws.h>
+#include <aws/core/auth/AWSCredentials.h>
+#include <aws/s3/S3Client.h>
+#include <aws/s3/model/PutObjectRequest.h>
 
 UCesiumDataUploader::UCesiumDataUploader()
 {
@@ -109,13 +107,13 @@ void UCesiumDataUploader::UploadFileToS3(const FString& FilePath, const FString&
     UE_LOG(LogTemp, Log, TEXT("Bucket: %s"), *Bucket);
     UE_LOG(LogTemp, Log, TEXT("AccessKey: %s"), *AccessKey);
     UE_LOG(LogTemp, Log, TEXT("SecretAccessKey: %s"), *SecretAccessKey);
-    
+    /*
     TArray<uint8> FileData;
     if (!FFileHelper::LoadFileToArray(FileData, *FilePath)) {
         UE_LOG(LogTemp, Error, TEXT("Failed to load file: %s"), *FilePath);
         return;
     }
-
+    
     Aws::SDKOptions options;
     Aws::InitAPI(options);
 
@@ -145,6 +143,7 @@ void UCesiumDataUploader::UploadFileToS3(const FString& FilePath, const FString&
     }
 
     Aws::ShutdownAPI(options);
+    */
 }
 
 void UCesiumDataUploader::OnS3UploadComplete(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
