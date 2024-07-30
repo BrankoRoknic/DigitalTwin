@@ -107,7 +107,7 @@ void UCesiumDataUploader::UploadFileToS3(const FString& FilePath, const FString&
     UE_LOG(LogTemp, Log, TEXT("Bucket: %s"), *Bucket);
     UE_LOG(LogTemp, Log, TEXT("AccessKey: %s"), *AccessKey);
     UE_LOG(LogTemp, Log, TEXT("SecretAccessKey: %s"), *SecretAccessKey);
-    /*
+    
     TArray<uint8> FileData;
     if (!FFileHelper::LoadFileToArray(FileData, *FilePath)) {
         UE_LOG(LogTemp, Error, TEXT("Failed to load file: %s"), *FilePath);
@@ -116,7 +116,7 @@ void UCesiumDataUploader::UploadFileToS3(const FString& FilePath, const FString&
     
     Aws::SDKOptions options;
     Aws::InitAPI(options);
-
+/*
     Aws::Client::ClientConfiguration clientConfig;
     clientConfig.region = Aws::Region::US_EAST_1;
     clientConfig.endpointOverride = TCHAR_TO_UTF8(*Endpoint);

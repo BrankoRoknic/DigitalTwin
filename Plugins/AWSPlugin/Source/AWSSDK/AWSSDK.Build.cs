@@ -20,12 +20,10 @@ public class AWSSDK : ModuleRules
         "aws-cpp-sdk-access-management",
         "aws-cpp-sdk-cognito-identity",
         "aws-cpp-sdk-core",
-       // "aws-cpp-sdk-s3",
-        "aws-cpp-sdk-transfer",
         "aws-cpp-sdk-iam",
         "aws-cpp-sdk-kinesis",
-        "aws-crt-cpp",
-        "aws-c-s3",
+        "aws-cpp-sdk-s3",
+        "aws-crt-cpp"
     };
 
     public AWSSDK(ReadOnlyTargetRules Target) : base(Target)
@@ -47,8 +45,8 @@ public class AWSSDK : ModuleRules
         // SDK. Source: https://github.com/aws/aws-sdk-cpp/blob/main/Docs/SDK_usage_guide.md#build-defines
         PublicDefinitions.Add("USE_IMPORT_EXPORT");
         PublicDefinitions.Add("AWS_CRT_CPP_USE_IMPORT_EXPORT");
-        //PublicDefinitions.Add("AWS_USE_IO_COMPLETION_PORTS");
         PublicDefinitions.Add("AWS_USE_IO_COMPLETION_PORTS=1");
+        PublicIncludePaths.Add(Path.Combine(ModuleDirectory, "Include"));
 
 
         if (Target.Platform == UnrealTargetPlatform.Win64)
@@ -76,12 +74,15 @@ public class AWSSDK : ModuleRules
                 // add linux libraries
             }
         }
+
         PrivateDependencyModuleNames.AddRange(
         new string[] {
-                    "CoreUObject",
-                    "Engine",
-                    "Slate",
-                    "SlateCore",   
+            "CoreUObject",
+            "Engine",
+            "Slate",
+            "SlateCore",
+            "InputCore",
+            "HeadMountedDisplay"  
         });
     }
 }
