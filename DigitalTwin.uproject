@@ -7,11 +7,7 @@
 		{
 			"Name": "DigitalTwin",
 			"Type": "Runtime",
-			"LoadingPhase": "Default",
-			"AdditionalDependencies": [
-				"Engine",
-				"CoreUObject"
-			]
+			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [
@@ -20,6 +16,19 @@
 			"Enabled": true,
 			"TargetAllowList": [
 				"Editor"
+			]
+		},
+		{
+			"Name": "EasyFileDialog",
+			"Enabled": true,
+			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/bcf64fe2e00c48189d8385a9c39b6e61"
+		},
+		{
+			"Name": "VisualStudioTools",
+			"Enabled": true,
+			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/362651520df94e4fa65492dbcba44ae2",
+			"SupportedTargetPlatforms": [
+				"Win64"
 			]
 		},
 		{
@@ -33,31 +42,6 @@
 				"Android",
 				"IOS"
 			]
-		},
-		{
-			"Name": "EasyFileDialog",
-			"Enabled": true,
-			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/bcf64fe2e00c48189d8385a9c39b6e61"
-		},
-		{
-			"Name": "BlueprintFileUtils",
-			"Enabled": true
-		},
-		{
-			"Name": "CommonUI",
-			"Enabled": true
-		},
-		{
-			"Name": "CodeView",
-			"Enabled": true
-		},
-		{
-			"Name": "FilePlugin",
-			"Enabled": false
-		},
-		{
-			"Name": "FileBrowser",
-			"Enabled": false
 		}
 	]
 }
