@@ -1,9 +1,10 @@
 #include "CesiumDataUploader.h"
+/*
 #include <aws/core/Aws.h>
 #include <aws/core/auth/AWSCredentials.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/model/PutObjectRequest.h>
-
+*/
 UCesiumDataUploader::UCesiumDataUploader()
 {
     // Constructor code if needed
@@ -113,10 +114,10 @@ void UCesiumDataUploader::UploadFileToS3(const FString& FilePath, const FString&
         UE_LOG(LogTemp, Error, TEXT("Failed to load file: %s"), *FilePath);
         return;
     }
-    
+  /*  
     Aws::SDKOptions options;
     Aws::InitAPI(options);
-/*
+
     Aws::Client::ClientConfiguration clientConfig;
     clientConfig.region = Aws::Region::US_EAST_1;
     clientConfig.endpointOverride = TCHAR_TO_UTF8(*Endpoint);

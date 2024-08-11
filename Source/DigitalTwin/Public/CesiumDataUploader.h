@@ -1,18 +1,18 @@
 #pragma once
+/*
 #ifdef CESIUMDATAUPLOADER_EXPORTS
 #define CESIUMDATAUPLOADER __declspec(dllexport)
 #else
 #define CESIUMDATAUPLOADER __declspec(dllimport)
 #endif
+*/
 #include "Interfaces/IHttpRequest.h"
-#include "Interfaces/IHttpResponse.h"
 #include "Misc/FileHelper.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
 #include "CoreMinimal.h"
 #include "HttpModule.h"
 #include "Dom/JsonObject.h"
-#include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Misc/FileHelper.h"
 #include "Serialization/JsonSerializer.h"
