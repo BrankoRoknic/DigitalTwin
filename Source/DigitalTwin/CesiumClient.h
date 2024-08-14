@@ -33,10 +33,15 @@ class DIGITALTWIN_API UCesiumClient : public UObject
 private:
 	FString fCesiumToken;
 	FString fFileName;
+	FString fNotifyCompleteURL;
+	FString fNotifyCompleteVerb;
+	int32 fFileSize;
 public:
 	UCesiumClient();
 	UFUNCTION(BlueprintCallable, Category = "Upload")
 	virtual void UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType);
 	void ProvideS3BucketData(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
+	void OnS3UploadProgress(FHttpRequestPtr request, int32 bytesSent, int32 bytesReceived);
 	void NotifyCesiumUploadComplete(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
+	void OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 };

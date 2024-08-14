@@ -49,8 +49,6 @@ std::string base64_encode(const std::string& bindata)
 }
 
 std::string hmac_sha256(const std::string& key, const std::string& data) {
-	UE_LOG(LogTemp, Error, TEXT("HMAC: %s, %s"), UTF8_TO_TCHAR(key.c_str()), UTF8_TO_TCHAR(data.c_str()));
-
 	unsigned char* digest = HMAC(EVP_sha256(), key.c_str(), key.length(), (unsigned char*)data.c_str(), data.length(), NULL, NULL);
 	return std::string((char*)digest, 32); // SHA256 produces a 32-byte hash
 }
@@ -126,7 +124,12 @@ void UCesiumClient::ProvideS3BucketData(FHttpRequestPtr request, FHttpResponsePt
 {
 	if (!wasSuccessful || !response.IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("Request Failed"));
+		UE_LOG(LogTemp, Error, TEXT("Failed to start upload with Cesium."));
+		return;
+	}
+	else if (response->GetResponseCode() != 200)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to start upload with Cesium Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
 		return;
 	}
 
@@ -143,8 +146,13 @@ void UCesiumClient::ProvideS3BucketData(FHttpRequestPtr request, FHttpResponsePt
 		return;
 	}
 
-	TSharedPtr<FJsonObject> uploadLocation = jsonObject->GetObjectField("uploadLocation");
+	// Set some field variables to be used in a later step from this response - Notify cesium on upload complete.
+	TSharedPtr<FJsonObject> onComplete = jsonObject->GetObjectField("onComplete");
+	fNotifyCompleteVerb = onComplete->GetStringField("method");
+	fNotifyCompleteURL = onComplete->GetStringField("url");
 
+	// Set some local variables to be used in constructing the S3 API Request
+	TSharedPtr<FJsonObject> uploadLocation = jsonObject->GetObjectField("uploadLocation");
 	FString endpoint = uploadLocation->GetStringField("endpoint");
 	FString bucket = uploadLocation->GetStringField("bucket");
 	FString prefix = uploadLocation->GetStringField("prefix");
@@ -174,6 +182,7 @@ void UCesiumClient::ProvideS3BucketData(FHttpRequestPtr request, FHttpResponsePt
 		UE_LOG(LogTemp, Error, TEXT("Failed to load file: %s"), *filePath);
 		return;
 	}
+	fFileSize = fileContent.Num();
 
 	// Get file name and S3 path
 	FString FileName = FPaths::GetCleanFilename(filePath);
@@ -190,84 +199,100 @@ void UCesiumClient::ProvideS3BucketData(FHttpRequestPtr request, FHttpResponsePt
 	if (!Http) return;
 
 	// Create the HTTP request
-	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = Http->CreateRequest();
-
-	//endpoint = "https://enjib4zsgqqrr.x.pipedream.net/"; // TODO: remove
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 
 	FString url = endpoint + S3Path;
 
-	UE_LOG(LogTemp, Error, TEXT("%s"), *url);
-
-	HttpRequest->SetURL(url);
-	HttpRequest->SetVerb("PUT");
-	HttpRequest->SetHeader("Host", bucket + ".s3.amazonaws.com");
-	HttpRequest->SetHeader("Content-Type", contentType);
-	HttpRequest->SetContent(fileContent);
+	Request->SetURL(url);
+	Request->SetVerb("PUT");
+	Request->SetHeader("Host", bucket + ".s3.amazonaws.com");
+	Request->SetHeader("Content-Type", contentType);
+	Request->SetContent(fileContent);
 
 	// AWS Signature Version 4 signing process
 	FString httpDate = FDateTime::UtcNow().ToHttpDate();
 	FString isoDatetime = FDateTime::UtcNow().ToFormattedString(TEXT("%Y%m%dT%H%M%S%Z"));
 	FString isoDate = FDateTime::UtcNow().ToFormattedString(TEXT("%Y%m%d"));
-
-	FString STSPath = FDateTime::UtcNow().ToFormattedString(TEXT("%Y%m%d/us-east-1/s3/aws4_request"));
-
-	//FString canonicalRequest = FString::Printf(TEXT("PUT\n%s\n%s\nx-amz-security-token:%s\n/%s/%s"), *contentType, *date, *sessionToken, *bucket, *S3Path);
+	FString STSPath = FString::Printf(TEXT("%s/us-east-1/s3/aws4_request"), *isoDate);
 
 	// Create the canonical request
 	FString contentHash = UTF8_TO_TCHAR(sha256(fileContent.GetData(), fileContent.Num()).c_str());
 
 	FString canonicalRequest = FString::Printf(TEXT("PUT\n/%s\n\ndate:%s\nhost:%s.s3.amazonaws.com\nx-amz-content-sha256:%s\nx-amz-security-token:%s\n\ndate;host;x-amz-content-sha256;x-amz-security-token\n%s"), *S3Path, *httpDate, *bucket, *contentHash, *sessionToken, *contentHash);
-	UE_LOG(LogTemp, Error, TEXT(".\n.\nCanonical Request: %s"), *canonicalRequest);
 
 	// Create the String to Sign
 	FString canonicalRequestHash = UTF8_TO_TCHAR(sha256((unsigned char*)TCHAR_TO_UTF8(*canonicalRequest), canonicalRequest.Len()).c_str());
 
 	FString stringToSign = FString::Printf(TEXT("AWS4-HMAC-SHA256\n%s\n%s\n%s"), *httpDate, *STSPath, *canonicalRequestHash);
 
-	UE_LOG(LogTemp, Error, TEXT("STS: %s"), *stringToSign);
-
 	// Create the signing key
 
 	std::string signingKey = hmac_sha256(hmac_sha256(hmac_sha256(hmac_sha256(TCHAR_TO_UTF8(*FString::Printf(TEXT("AWS4%s"), *secretAccessKey)), TCHAR_TO_UTF8(*isoDate)), "us-east-1"), "s3"), "aws4_request");
 	std::string hmacResult = hmac_sha256(signingKey, TCHAR_TO_UTF8(*stringToSign));
 
-	// Base64 encode the result
 	FString signature = UTF8_TO_TCHAR(bytesToHexString(reinterpret_cast<const unsigned char*>(hmacResult.c_str()), hmacResult.size()).c_str());
 	FString signedHeaders = "date;host;x-amz-content-sha256;x-amz-security-token";
 
 	// Add the Authorization header
 	FString AuthorizationHeader = FString::Printf(TEXT("AWS4-HMAC-SHA256 Credential=%s/%s,SignedHeaders=%s,Signature=%s"), *accessKey, *STSPath, *signedHeaders, *signature);
 
-	UE_LOG(LogTemp, Error, TEXT("%s"), *AuthorizationHeader);
-	HttpRequest->SetHeader("Date", *httpDate);
-	HttpRequest->SetHeader("Authorization", AuthorizationHeader);
-	HttpRequest->SetHeader("x-amz-content-sha256", contentHash);
-	UE_LOG(LogTemp, Error, TEXT("ghi"));
-	if (!sessionToken.IsEmpty())
-	{
-		HttpRequest->SetHeader("x-amz-security-token", sessionToken);
-	}
-
-	// Bind to the response event
-	HttpRequest->OnProcessRequestComplete().BindLambda([](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
-		{
-			UE_LOG(LogTemp, Error, TEXT("jkl"));
-			if (bWasSuccessful && Response->GetResponseCode() == 200)
-			{
-				UE_LOG(LogTemp, Log, TEXT("File successfully uploaded to S3."));
-			}
-			else
-			{
-				UE_LOG(LogTemp, Error, TEXT("Failed to upload file to S3. Response code: %d Content %s"), Response->GetResponseCode(), *Response->GetContentAsString());
-			}
-		});
+	Request->SetHeader("Date", *httpDate);
+	Request->SetHeader("Authorization", AuthorizationHeader);
+	Request->SetHeader("x-amz-content-sha256", contentHash);
+	Request->SetHeader("x-amz-security-token", sessionToken);
 
 	// Execute the request
-	//HttpRequest->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::NotifyCesiumUploadComplete);
-	HttpRequest->ProcessRequest();
+	Request->OnRequestProgress().BindUObject(this, &UCesiumClient::OnS3UploadProgress);
+	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::NotifyCesiumUploadComplete);
+	Request->ProcessRequest();
 }
 
 void UCesiumClient::NotifyCesiumUploadComplete(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
 {
-	//fix 
+	// Validate the response from 
+	if (!wasSuccessful || !response.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to upload file to S3."));
+		return;
+	}
+	else if (response->GetResponseCode() != 200)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to upload file to S3. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
+		return;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("File successfully uploaded to S3."));
+
+	// Notify cesium that the upload is complete here
+	FHttpModule* Http = &FHttpModule::Get();
+	if (!Http) return;
+
+	// Create the HTTP request
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+	Request->SetURL(fNotifyCompleteURL);
+	Request->SetVerb(fNotifyCompleteVerb);
+	Request->SetHeader("Authorization", "Bearer " + this->fCesiumToken);
+
+	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::OnCesiumUploadCompletion);
+	Request->ProcessRequest();
+}
+
+void UCesiumClient::OnS3UploadProgress(FHttpRequestPtr request, int32 bytesSent, int32 bytesReceived) {
+	float percentage = 100.f * bytesSent / fFileSize;
+	UE_LOG(LogTemp, Log, TEXT("S3 upload progress: %d/%d (%.0f%%)"), bytesSent, fFileSize, percentage);
+}
+
+void UCesiumClient::OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful) {
+	if (!wasSuccessful || !response.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to notify Cesium."));
+		return;
+	}
+	else if (response->GetResponseCode() != 204)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to notify Cesium. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
+		return;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("Successfully notified Cesium of file upload."));
 }
