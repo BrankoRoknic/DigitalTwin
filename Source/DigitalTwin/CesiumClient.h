@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Cesium3DTileset.h"
+#include "CesiumGeoreference.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "HttpModule.h"
@@ -16,6 +18,7 @@
 #include <limits>
 #include <stdexcept>
 #include <cctype>
+#include <filesystem>
 #define UI UI_ST
 THIRD_PARTY_INCLUDES_START
 #include "openssl/sha.h"
@@ -35,6 +38,7 @@ private:
 	FString fFileName;
 	FString fNotifyCompleteURL;
 	FString fNotifyCompleteVerb;
+	TArray<FString> fActiveAssets;
 	int32 fFileSize;
 public:
 	UCesiumClient();
@@ -44,4 +48,15 @@ public:
 	void OnS3UploadProgress(FHttpRequestPtr request, int32 bytesSent, int32 bytesReceived);
 	void NotifyCesiumUploadComplete(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 	void OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
+
+	UFUNCTION(BlueprintCallable, Category = "List")
+	void ListAssets(bool retreiveFlag);
+	void ListResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
+
+	UFUNCTION(BlueprintCallable, Category = "Retrieve")
+	void RetrieveActiveAssets();
+	void StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
+
+	UFUNCTION(BlueprintCallable, Category = "Render")
+	void RenderAssetsInLevel();
 };

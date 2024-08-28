@@ -96,8 +96,14 @@ void UCesiumClient::UploadFile(FString aFile, FString aName, FString aConversion
 	Request->SetHeader("Content-Type", "application/json");
 
 	// Set request payload
+	char* lPath = TCHAR_TO_ANSI(*aFile);
+	std::filesystem::path p(lPath);
+	// Use p.filename() if you want the extension included in future
+
+	FString fileName = p.stem().string().c_str();
+	UE_LOG(LogTemp, Error, TEXT("The input string provided is: %s"), *fileName);
 	TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
-	JsonObject->SetStringField("name", aName);
+	JsonObject->SetStringField("name", fileName);
 	JsonObject->SetStringField("description", "");
 	JsonObject->SetStringField("type", aConversionType);   // This is specifying what you want cesium to do with the uploaded data - IE create 3D tiles
 
@@ -296,3 +302,110 @@ void UCesiumClient::OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpRespo
 
 	UE_LOG(LogTemp, Log, TEXT("Successfully notified Cesium of file upload."));
 }
+
+void UCesiumClient::ListAssets(bool retreiveFlag)
+{
+	FHttpModule* Http = &FHttpModule::Get();
+	if (!Http) return;
+
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+	Request->SetURL("https://api.cesium.com/v1/assets");
+	Request->SetVerb("GET");
+
+	Request->SetHeader("Authorization", "Bearer " + fCesiumToken);
+
+	retreiveFlag = true; // REMOVE THIS WHEN FINISHED, JUST HERE FOR NOW
+
+	if (retreiveFlag)
+	{
+		Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::ListResponse);
+	}
+	Request->ProcessRequest();
+
+}
+
+void UCesiumClient::ListResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
+{
+	FString data = response->GetContentAsString();
+	UE_LOG(LogTemp, Display, TEXT("HTTP GET response from Cesium: %s"), *data);
+}
+
+void UCesiumClient::RetrieveActiveAssets()
+{
+	FHttpModule* Http = &FHttpModule::Get();
+	if (!Http) return;
+
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+	Request->SetURL("https://api.cesium.com/v1/assets?search=ACTIVE");
+	Request->SetVerb("GET");
+
+	Request->SetHeader("Authorization", "Bearer " + fCesiumToken);
+
+	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::StoreActiveAssets);
+	Request->ProcessRequest();
+}
+
+void UCesiumClient::StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
+{
+	FString data = response->GetContentAsString();
+	UE_LOG(LogTemp, Display, TEXT("HTTP GET response from Cesium: %s"), *data);
+
+	// Parse the JSON response
+	TSharedRef<TJsonReader<TCHAR>> jsonReader = TJsonReaderFactory<TCHAR>::Create(data);
+	TSharedPtr<FJsonObject> jsonObject;
+
+	if (!FJsonSerializer::Deserialize(jsonReader, jsonObject) || !jsonObject.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to parse JSON"));
+		return;
+	}
+
+	const TArray<TSharedPtr<FJsonValue, ESPMode::ThreadSafe>> items = jsonObject->GetArrayField("items");
+	int lActiveAssetsIndex = 0;
+	for (int i = 0; i < items.Num(); i++)
+	{
+		const TSharedPtr<FJsonObject> itemObject = items[i]->AsObject();
+		if (itemObject.IsValid())
+		{
+			FString lOutput;
+			if (itemObject->TryGetStringField("id", lOutput))
+			{
+				fActiveAssets.Add(lOutput);
+				UE_LOG(LogTemp, Log, TEXT("Item %d ID: %s"), lActiveAssetsIndex, *fActiveAssets[lActiveAssetsIndex]);
+				lActiveAssetsIndex++;
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Item %d does not contain an 'id' field"), i);
+			}
+		}
+	}
+
+}
+
+void UCesiumClient::RenderAssetsInLevel()
+{
+	// Assuming fActiveAssets contains your list of asset IDs
+
+	for (const FString& AssetID : fActiveAssets)
+	{
+		// Construct the URL or path to the tileset.json file for this asset
+		//FString TilesetURL = FString::Printf(TEXT("https://api.cesium.com/tilesets/%s/tileset.json"), *AssetID);
+		//// Spawn a Cesium3DTileset actor in the level
+		//ACesium3DTileset* TilesetActor = GetWorld()->SpawnActor<ACesium3DTileset>(ACesium3DTileset::StaticClass());
+		//if (TilesetActor)
+		//{
+		//	TilesetActor.Source = ETilesetSourceType::FromURL;
+		//	// Load the tileset using the specified source
+		//	TilesetActor->SetTilesetSource(TilesetURL);
+		//	//TilesetActor->();
+		//	// Optionally set the location, rotation, or other properties of the actor
+		//	//TilesetActor->SetActorLocation(FVector(0.0f, 0.0f, 0.0f));// Example: placing at the origin
+		//}
+		//else
+		//{
+		//	UE_LOG(LogTemp, Error, TEXT("Failed to spawn Cesium3DTileset actor for Asset ID: %s"), *AssetID);
+		//}
+	}
+}
+

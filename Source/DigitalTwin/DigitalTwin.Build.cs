@@ -8,7 +8,7 @@ public class DigitalTwin : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "HTTP", "Json", "OpenSSL" });
+        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "HTTP", "Json", "OpenSSL", "CesiumRuntime" });
 
         PrivateDependencyModuleNames.AddRange(new string[] { });
 
