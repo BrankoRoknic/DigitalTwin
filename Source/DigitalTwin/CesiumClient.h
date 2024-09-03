@@ -59,4 +59,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Render")
 	void RenderAssetsInLevel();
+
+	UFUNCTION(BlueprintCallable, Category = "GetfActiveAssets")
+	TArray<FString> GetfActiveAssets();
 };
