@@ -411,6 +411,7 @@ void UCesiumClient::RenderAssetsInLevel()
 
 TArray<FString> UCesiumClient::GetActiveAssets()
 {
+	UE_LOG(LogTemp, Log, TEXT("Length: %d"), fActiveAssets.Num());
 	return fActiveAssets;
 }
 
