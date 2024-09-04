@@ -76,6 +76,7 @@ UCesiumClient::UCesiumClient()
 {
 	// This field variable contains the access key from Cesium
 	fCesiumToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwM2MzYTRlNC04MzMzLTRhMDktODVjZS00Mjc0NWRjNGYyNjAiLCJpZCI6MjEzODI0LCJpYXQiOjE3MjE5ODk4MjV9.aDuw8NxL3XgyrWkZ7oqmhX6ImPXJgUG8ZCnxu--UPDs";
+	fActiveFlag = false;
 }
 
 void UCesiumClient::UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType)
@@ -361,61 +362,52 @@ void UCesiumClient::StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr 
 	}
 
 	const TArray<TSharedPtr<FJsonValue, ESPMode::ThreadSafe>> items = jsonObject->GetArrayField("items");
-	int lActiveAssetsIndex = 0;
+	int lActiveTifIndex = 0;
+	int lActiveLasIndex = 0;
 	for (int i = 0; i < items.Num(); i++)
 	{
 		const TSharedPtr<FJsonObject> itemObject = items[i]->AsObject();
 		if (itemObject.IsValid())
 		{
 			FString lOutput;
+			FString lType;
 			if (itemObject->TryGetStringField("id", lOutput))
 			{
-				fActiveAssets.Add(lOutput);
-				UE_LOG(LogTemp, Log, TEXT("Item %d ID: %s"), lActiveAssetsIndex, *fActiveAssets[lActiveAssetsIndex]);
-				lActiveAssetsIndex++;
+				itemObject->TryGetStringField("type", lType);
+				if (lType == "IMAGERY")
+				{
+					fActiveTif.Add(lOutput);
+					UE_LOG(LogTemp, Log, TEXT("GeoTiff item added with ID: %s"), *fActiveTif[lActiveTifIndex]);
+					lActiveTifIndex++;
+				}
+				else if (lType == "3DTILES")
+				{
+					fActiveLas.Add(lOutput);
+					UE_LOG(LogTemp, Log, TEXT("LAS item added with ID: %s"), *fActiveLas[lActiveLasIndex]);
+					lActiveLasIndex++;
+				}
 			}
 			else
 			{
-				UE_LOG(LogTemp, Warning, TEXT("Item %d does not contain an 'id' field"), i);
+				UE_LOG(LogTemp, Warning, TEXT("Active item no. %d does not contain an 'id' field"), i);
 			}
 		}
 	}
-
+	/*	TODO:
+		Use this active flag at a later date to handle the race condition caused by this function - a delay is currently required in blueprints
+		to stop it from reading values from GetActiveTif before the http responce is completed. This needs to be fixed at some point.
+	*/
+	fActiveFlag = true;
+	UE_LOG(LogTemp, Log, TEXT("Flag Value: %d"), fActiveFlag);
 }
 
-void UCesiumClient::RenderAssetsInLevel()
-{
-	// Assuming fActiveAssets contains your list of asset IDs
+TArray<FString> UCesiumClient::GetActiveTif() { UE_LOG(LogTemp, Log, TEXT("fActiveTif Length: %d"), fActiveTif.Num());	return fActiveTif; }
 
-	for (const FString& AssetID : fActiveAssets)
-	{
-		// Construct the URL or path to the tileset.json file for this asset
-		//FString TilesetURL = FString::Printf(TEXT("https://api.cesium.com/tilesets/%s/tileset.json"), *AssetID);
-		//// Spawn a Cesium3DTileset actor in the level
-		//ACesium3DTileset* TilesetActor = GetWorld()->SpawnActor<ACesium3DTileset>(ACesium3DTileset::StaticClass());
-		//if (TilesetActor)
-		//{
-		//	TilesetActor.Source = ETilesetSourceType::FromURL;
-		//	// Load the tileset using the specified source
-		//	TilesetActor->SetTilesetSource(TilesetURL);
-		//	//TilesetActor->();
-		//	// Optionally set the location, rotation, or other properties of the actor
-		//	//TilesetActor->SetActorLocation(FVector(0.0f, 0.0f, 0.0f));// Example: placing at the origin
-		//}
-		//else
-		//{
-		//	UE_LOG(LogTemp, Error, TEXT("Failed to spawn Cesium3DTileset actor for Asset ID: %s"), *AssetID);
-		//}
-	}
-}
+TArray<FString> UCesiumClient::GetActiveLas() { UE_LOG(LogTemp, Log, TEXT("fActiveLas Length: %d"), fActiveLas.Num());	return fActiveLas; }
 
-TArray<FString> UCesiumClient::GetActiveAssets()
-{
-	UE_LOG(LogTemp, Log, TEXT("Length: %d"), fActiveAssets.Num());
-	return fActiveAssets;
-}
+FString UCesiumClient::GetCesiumToken() { return fCesiumToken; }
 
-FString UCesiumClient::GetCesiumToken()
-{
-	return fCesiumToken;
-}
+// TODO: The below get and set methods may be deleted but double check first, I do not beleive we need them anymore.
+bool UCesiumClient::GetActiveFlag() { UE_LOG(LogTemp, Log, TEXT("Flag Value: %d"), fActiveFlag); return fActiveFlag; }
+
+void UCesiumClient::SetActiveFlag(bool aValue) { fActiveFlag = aValue; }

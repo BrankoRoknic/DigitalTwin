@@ -38,7 +38,9 @@ private:
 	FString fFileName;
 	FString fNotifyCompleteURL;
 	FString fNotifyCompleteVerb;
-	TArray<FString> fActiveAssets;
+	TArray<FString> fActiveLas;
+	TArray<FString> fActiveTif;
+	bool fActiveFlag;
 	int32 fFileSize;
 public:
 	UCesiumClient();
@@ -57,12 +59,18 @@ public:
 	void RetrieveActiveAssets();
 	void StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 
-	UFUNCTION(BlueprintCallable, Category = "Render")
-	void RenderAssetsInLevel();
+	UFUNCTION(BlueprintCallable, Category = "GetActiveAssets")
+	TArray<FString> GetActiveTif();
 
 	UFUNCTION(BlueprintCallable, Category = "GetActiveAssets")
-	TArray<FString> GetActiveAssets();
+	TArray<FString> GetActiveLas();
 
 	UFUNCTION(BlueprintCallable, Category = "GetCesiumAccessToken")
 	FString GetCesiumToken();
+
+	UFUNCTION(BlueprintCallable, Category = "GetActiveFlag")
+	bool GetActiveFlag();
+
+	UFUNCTION(BlueprintCallable, Category = "SetActiveFlag")
+	void SetActiveFlag(bool aValue);
 };
