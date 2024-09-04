@@ -409,7 +409,12 @@ void UCesiumClient::RenderAssetsInLevel()
 	}
 }
 
-TArray<FString> UCesiumClient::GetfActiveAssets()
+TArray<FString> UCesiumClient::GetActiveAssets()
 {
 	return fActiveAssets;
+}
+
+FString UCesiumClient::GetCesiumToken()
+{
+	return fCesiumToken;
 }

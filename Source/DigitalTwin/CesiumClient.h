@@ -60,6 +60,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Render")
 	void RenderAssetsInLevel();
 
-	UFUNCTION(BlueprintCallable, Category = "GetfActiveAssets")
-	TArray<FString> GetfActiveAssets();
+	UFUNCTION(BlueprintCallable, Category = "GetActiveAssets")
+	TArray<FString> GetActiveAssets();
+
+	UFUNCTION(BlueprintCallable, Category = "GetCesiumAccessToken")
+	FString GetCesiumToken();
 };
