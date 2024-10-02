@@ -77,6 +77,15 @@ UCesiumClient::UCesiumClient()
 	// This field variable contains the access key from Cesium
 	fCesiumToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwM2MzYTRlNC04MzMzLTRhMDktODVjZS00Mjc0NWRjNGYyNjAiLCJpZCI6MjEzODI0LCJpYXQiOjE3MjE5ODk4MjV9.aDuw8NxL3XgyrWkZ7oqmhX6ImPXJgUG8ZCnxu--UPDs";
 	fActiveFlag = false;
+
+	// Create a TArray of FStrings containing the names of all default assets from cesium that are used in the digital twin engine,
+	// this is so that they can be removed from client facing lists so they cannot be accidentally deleted.
+	fIgnoredAssets.Add(FString("Cesium World Terrain"));
+	fIgnoredAssets.Add(FString("Bing Maps Aerial"));
+	fIgnoredAssets.Add(FString("Bing Maps Aerial with Labels"));
+	fIgnoredAssets.Add(FString("Bing Maps Road"));
+	fIgnoredAssets.Add(FString("Cesium OSM Buildings"));
+	fIgnoredAssets.Add(FString("Google Photorealistic 3D Tiles"));
 }
 
 void UCesiumClient::UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType)
@@ -331,6 +340,21 @@ void UCesiumClient::ListResponse(FHttpRequestPtr request, FHttpResponsePtr respo
 	UE_LOG(LogTemp, Display, TEXT("HTTP GET response from Cesium: %s"), *data);
 }
 
+void UCesiumClient::RetrieveAllAssets()
+{
+	FHttpModule* Http = &FHttpModule::Get();
+	if (!Http) return;
+
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+	Request->SetURL("https://api.cesium.com/v1/assets");
+	Request->SetVerb("GET");
+
+	Request->SetHeader("Authorization", "Bearer " + fCesiumToken);
+
+	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::StoreAllAssets);
+	Request->ProcessRequest();
+}
+
 void UCesiumClient::RetrieveActiveAssets()
 {
 	FHttpModule* Http = &FHttpModule::Get();
@@ -344,6 +368,49 @@ void UCesiumClient::RetrieveActiveAssets()
 
 	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::StoreActiveAssets);
 	Request->ProcessRequest();
+}
+
+void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
+{
+	FString data = response->GetContentAsString();
+	UE_LOG(LogTemp, Display, TEXT("HTTP GET response from Cesium: %s"), *data);
+
+	// Parse the JSON response
+	TSharedRef<TJsonReader<TCHAR>> jsonReader = TJsonReaderFactory<TCHAR>::Create(data);
+	TSharedPtr<FJsonObject> jsonObject;
+
+	if (!FJsonSerializer::Deserialize(jsonReader, jsonObject) || !jsonObject.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to parse JSON"));
+		return;
+	}
+
+	const TArray<TSharedPtr<FJsonValue, ESPMode::ThreadSafe>> items = jsonObject->GetArrayField("items");
+	for (int i = 0; i < items.Num(); i++)
+	{
+		const TSharedPtr<FJsonObject> itemObject = items[i]->AsObject();
+		if (itemObject.IsValid())
+		{
+			UCesiumAsset* lAsset = NewObject<UCesiumAsset>();
+			FString lId;
+			FString lName;
+			FString lUploadDate;
+			FString lDataType;
+			if (itemObject->TryGetStringField("id", lId) &&
+				itemObject->TryGetStringField("name", lName) &&
+				itemObject->TryGetStringField("dateAdded", lUploadDate) &&
+				itemObject->TryGetStringField("type", lDataType))
+			{
+				lAsset->Construct(lId, lName, lUploadDate, lDataType);
+				// Skip adding assets to the list if they are digital twin engine dependant.
+				if (fIgnoredAssets.Contains(lName))
+				{
+					continue;
+				}
+				fAllAssetData.Add(lAsset);
+			}
+		}
+	}
 }
 
 void UCesiumClient::StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
@@ -400,6 +467,8 @@ void UCesiumClient::StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr 
 	fActiveFlag = true;
 	UE_LOG(LogTemp, Log, TEXT("Flag Value: %d"), fActiveFlag);
 }
+TArray<UCesiumAsset*> UCesiumClient::GetAllAssetData() { UE_LOG(LogTemp, Log, TEXT("fAllAssetData Length: %d"), fAllAssetData.Num());	return fAllAssetData; }
+int32 UCesiumClient::GetAllAssetSize() { UE_LOG(LogTemp, Log, TEXT("fAllAssetData Length: %d"), fAllAssetData.Num());	return fAllAssetData.Num(); }
 
 TArray<FString> UCesiumClient::GetActiveTif() { UE_LOG(LogTemp, Log, TEXT("fActiveTif Length: %d"), fActiveTif.Num());	return fActiveTif; }
 

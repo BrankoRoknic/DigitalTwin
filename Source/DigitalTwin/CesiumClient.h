@@ -2,6 +2,7 @@
 
 #include "Cesium3DTileset.h"
 #include "CesiumGeoreference.h"
+#include "CesiumAsset.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "HttpModule.h"
@@ -38,13 +39,15 @@ private:
 	FString fFileName;
 	FString fNotifyCompleteURL;
 	FString fNotifyCompleteVerb;
+	TArray<FString> fIgnoredAssets;
+	TArray<UCesiumAsset*> fAllAssetData;
 	TArray<FString> fActiveLas;
 	TArray<FString> fActiveTif;
 	bool fActiveFlag;
 	int32 fFileSize;
 public:
 	UCesiumClient();
-	UFUNCTION(BlueprintCallable, Category = "Upload")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Upload")
 	virtual void UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType);
 	void ProvideS3BucketData(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 	void OnS3UploadProgress(FHttpRequestPtr request, int32 bytesSent, int32 bytesReceived);
@@ -59,18 +62,29 @@ public:
 	void RetrieveActiveAssets();
 	void StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 
-	UFUNCTION(BlueprintCallable, Category = "GetActiveAssets")
+	UFUNCTION(BlueprintCallable, Category = "Retrieve")
+	void RetrieveAllAssets();
+	void StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
+	bool isDefautCesiumAsset(FString aString);
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	TArray<FString> GetActiveTif();
 
-	UFUNCTION(BlueprintCallable, Category = "GetActiveAssets")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
+	TArray<UCesiumAsset*> GetAllAssetData();
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
+	int32 GetAllAssetSize();
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	TArray<FString> GetActiveLas();
 
-	UFUNCTION(BlueprintCallable, Category = "GetCesiumAccessToken")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	FString GetCesiumToken();
 
-	UFUNCTION(BlueprintCallable, Category = "GetActiveFlag")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	bool GetActiveFlag();
 
-	UFUNCTION(BlueprintCallable, Category = "SetActiveFlag")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	void SetActiveFlag(bool aValue);
 };
