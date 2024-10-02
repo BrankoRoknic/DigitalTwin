@@ -298,7 +298,8 @@ void UCesiumClient::OnS3UploadProgress(FHttpRequestPtr request, int32 bytesSent,
 	UE_LOG(LogTemp, Log, TEXT("S3 upload progress: %d/%d (%.0f%%)"), bytesSent, fFileSize, percentage);
 }
 
-void UCesiumClient::OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful) {
+void UCesiumClient::OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
+{
 	if (!wasSuccessful || !response.IsValid())
 	{
 		UE_LOG(LogTemp, Error, TEXT("Failed to notify Cesium."));
@@ -402,7 +403,7 @@ void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr res
 				itemObject->TryGetStringField("type", lDataType))
 			{
 				lAsset->Construct(lId, lName, lUploadDate, lDataType);
-				// Skip adding assets to the list if they are digital twin engine dependant.
+				// Skip adding assets to the list if they are components of the digital twin engine.
 				if (fIgnoredAssets.Contains(lName))
 				{
 					continue;
@@ -411,6 +412,63 @@ void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr res
 			}
 		}
 	}
+}
+
+void UCesiumClient::UpdateAssetActiveState(UCesiumAsset* aCesiumAsset)
+{
+	FHttpModule* Http = &FHttpModule::Get();
+	if (!Http) return;
+
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+	UE_LOG(LogTemp, Error, TEXT("Passed in Asset ID: %s"), *aCesiumAsset->fId);
+	Request->SetURL("https://api.cesium.com/v1/assets/" + aCesiumAsset->fId);
+	Request->SetVerb("PATCH");
+
+	Request->SetHeader("Authorization", "Bearer " + fCesiumToken);
+	Request->SetHeader("Content-Type", "application/json");
+
+
+	TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
+
+	UE_LOG(LogTemp, Error, TEXT("Changing name to: %s"), *aCesiumAsset->fActualItemName);
+	JsonObject->SetStringField("name", aCesiumAsset->fActualItemName);
+	FString RequestBody;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&RequestBody);
+	FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer);
+	Request->SetContentAsString(RequestBody);
+	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::LogCesiumResponse);
+	Request->ProcessRequest();
+	aCesiumAsset->SetCurrentlyActive(!aCesiumAsset->GetCurrentlyActive());
+}
+
+void UCesiumClient::LogCesiumResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
+{
+	if (!wasSuccessful || !response.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to update asset data on Cesium."));
+		return;
+	}
+	else if (response->GetResponseCode() != 204)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to update asset data on Cesium. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
+		return;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("Successfully updated asset data on Cesium."));
+}
+
+void UCesiumClient::DeleteAssetFromCesiumIon(UCesiumAsset* aCesiumAsset)
+{
+	FHttpModule* Http = &FHttpModule::Get();
+	if (!Http) return;
+
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+	UE_LOG(LogTemp, Error, TEXT("Passed in Asset to detele:\nID: %s\nName: %s"), *aCesiumAsset->fId, *aCesiumAsset->fActualItemName);
+	Request->SetURL("https://api.cesium.com/v1/assets/" + aCesiumAsset->fId);
+	Request->SetVerb("DELETE");
+	Request->SetHeader("Authorization", "Bearer " + fCesiumToken);
+	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::LogCesiumResponse);
+	Request->ProcessRequest();
 }
 
 void UCesiumClient::StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
@@ -467,7 +525,22 @@ void UCesiumClient::StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr 
 	fActiveFlag = true;
 	UE_LOG(LogTemp, Log, TEXT("Flag Value: %d"), fActiveFlag);
 }
+
+UCesiumAsset* UCesiumClient::GetAllAssetDataElementByDisplayName(FString aName)
+{
+	for (UCesiumAsset* lAsset : fAllAssetData)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UCesiumAsset.displayname == aName	:	%s == %s"), *lAsset->fDisplayName, *aName);
+		if (lAsset->fDisplayName == aName)
+		{
+			return lAsset;
+		}
+	}
+	return NewObject<UCesiumAsset>();;
+}
+
 TArray<UCesiumAsset*> UCesiumClient::GetAllAssetData() { UE_LOG(LogTemp, Log, TEXT("fAllAssetData Length: %d"), fAllAssetData.Num());	return fAllAssetData; }
+
 int32 UCesiumClient::GetAllAssetSize() { UE_LOG(LogTemp, Log, TEXT("fAllAssetData Length: %d"), fAllAssetData.Num());	return fAllAssetData.Num(); }
 
 TArray<FString> UCesiumClient::GetActiveTif() { UE_LOG(LogTemp, Log, TEXT("fActiveTif Length: %d"), fActiveTif.Num());	return fActiveTif; }

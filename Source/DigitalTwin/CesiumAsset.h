@@ -13,6 +13,7 @@ public:
 
 	// Member Variables:
 	FString fId;
+	FString fActualItemName;
 	FString fDisplayName;
 	bool fCurrentlyActive;
 	FString fUploadDate;
@@ -21,6 +22,8 @@ public:
 	// Constructor
 	UCesiumAsset();
 	void Construct(FString aId, FString aItemName, FString aDate, FString aDataType);
+	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Control Method")
+	bool IsActiveDifferent(bool aBool);
 
 	// Getters:
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Get Methods")

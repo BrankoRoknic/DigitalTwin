@@ -47,31 +47,40 @@ private:
 	int32 fFileSize;
 public:
 	UCesiumClient();
-	UFUNCTION(BlueprintCallable, Category = "CesiumClient Upload")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Create")
 	virtual void UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType);
 	void ProvideS3BucketData(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 	void OnS3UploadProgress(FHttpRequestPtr request, int32 bytesSent, int32 bytesReceived);
 	void NotifyCesiumUploadComplete(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 	void OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 
-	UFUNCTION(BlueprintCallable, Category = "List")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient List")
 	void ListAssets(bool retreiveFlag);
 	void ListResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 
-	UFUNCTION(BlueprintCallable, Category = "Retrieve")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Retrieve")
 	void RetrieveActiveAssets();
 	void StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 
-	UFUNCTION(BlueprintCallable, Category = "Retrieve")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Retrieve")
 	void RetrieveAllAssets();
 	void StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
-	bool isDefautCesiumAsset(FString aString);
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Update")
+	void UpdateAssetActiveState(UCesiumAsset* aCesiumAsset);
+	void LogCesiumResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Delete")
+	void DeleteAssetFromCesiumIon(UCesiumAsset* aCesiumAsset);
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	TArray<FString> GetActiveTif();
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	TArray<UCesiumAsset*> GetAllAssetData();
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
+	UCesiumAsset* GetAllAssetDataElementByDisplayName(FString aName);
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	int32 GetAllAssetSize();
