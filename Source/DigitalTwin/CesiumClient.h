@@ -30,6 +30,12 @@ THIRD_PARTY_INCLUDES_END
 #undef UI
 #include "CesiumClient.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRetreiveAllAssetsResponse);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCesiumUploadCompletionResponse);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRetrieveActiveAssetsResponse);
+
 UCLASS(Blueprintable)
 class DIGITALTWIN_API UCesiumClient : public UObject
 {
@@ -43,9 +49,18 @@ private:
 	TArray<UCesiumAsset*> fAllAssetData;
 	TArray<FString> fActiveLas;
 	TArray<FString> fActiveTif;
-	bool fActiveFlag;
 	int32 fFileSize;
 public:
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FRetreiveAllAssetsResponse RetreiveAllAssetsResponse;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnCesiumUploadCompletionResponse OnCesiumUploadCompletionResponse;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FRetrieveActiveAssetsResponse RetrieveActiveAssetsResponse;
+
 	UCesiumClient();
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Create")
 	virtual void UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType);
@@ -90,10 +105,4 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	FString GetCesiumToken();
-
-	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
-	bool GetActiveFlag();
-
-	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
-	void SetActiveFlag(bool aValue);
 };

@@ -76,7 +76,6 @@ UCesiumClient::UCesiumClient()
 {
 	// This field variable contains the access key from Cesium
 	fCesiumToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwM2MzYTRlNC04MzMzLTRhMDktODVjZS00Mjc0NWRjNGYyNjAiLCJpZCI6MjEzODI0LCJpYXQiOjE3MjE5ODk4MjV9.aDuw8NxL3XgyrWkZ7oqmhX6ImPXJgUG8ZCnxu--UPDs";
-	fActiveFlag = false;
 
 	// Create a TArray of FStrings containing the names of all default assets from cesium that are used in the digital twin engine,
 	// this is so that they can be removed from client facing lists so they cannot be accidentally deleted.
@@ -300,6 +299,7 @@ void UCesiumClient::OnS3UploadProgress(FHttpRequestPtr request, int32 bytesSent,
 
 void UCesiumClient::OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
 {
+	OnCesiumUploadCompletionResponse.Broadcast();
 	if (!wasSuccessful || !response.IsValid())
 	{
 		UE_LOG(LogTemp, Error, TEXT("Failed to notify Cesium."));
@@ -310,7 +310,6 @@ void UCesiumClient::OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpRespo
 		UE_LOG(LogTemp, Error, TEXT("Failed to notify Cesium. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
 		return;
 	}
-
 	UE_LOG(LogTemp, Log, TEXT("Successfully notified Cesium of file upload."));
 }
 
@@ -373,6 +372,7 @@ void UCesiumClient::RetrieveActiveAssets()
 
 void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
 {
+	RetreiveAllAssetsResponse.Broadcast();
 	FString data = response->GetContentAsString();
 	UE_LOG(LogTemp, Display, TEXT("HTTP GET response from Cesium: %s"), *data);
 
@@ -518,12 +518,7 @@ void UCesiumClient::StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr 
 			}
 		}
 	}
-	/*	TODO:
-		Use this active flag at a later date to handle the race condition caused by this function - a delay is currently required in blueprints
-		to stop it from reading values from GetActiveTif before the http responce is completed. This needs to be fixed at some point.
-	*/
-	fActiveFlag = true;
-	UE_LOG(LogTemp, Log, TEXT("Flag Value: %d"), fActiveFlag);
+	RetrieveActiveAssetsResponse.Broadcast();
 }
 
 UCesiumAsset* UCesiumClient::GetAllAssetDataElementByDisplayName(FString aName)
@@ -549,7 +544,3 @@ TArray<FString> UCesiumClient::GetActiveLas() { UE_LOG(LogTemp, Log, TEXT("fActi
 
 FString UCesiumClient::GetCesiumToken() { return fCesiumToken; }
 
-// TODO: The below get and set methods may be deleted but double check first, I do not beleive we need them anymore.
-bool UCesiumClient::GetActiveFlag() { UE_LOG(LogTemp, Log, TEXT("Flag Value: %d"), fActiveFlag); return fActiveFlag; }
-
-void UCesiumClient::SetActiveFlag(bool aValue) { fActiveFlag = aValue; }
