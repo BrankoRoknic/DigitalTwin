@@ -372,7 +372,6 @@ void UCesiumClient::RetrieveActiveAssets()
 
 void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
 {
-	RetreiveAllAssetsResponse.Broadcast();
 	FString data = response->GetContentAsString();
 	UE_LOG(LogTemp, Display, TEXT("HTTP GET response from Cesium: %s"), *data);
 
@@ -397,27 +396,34 @@ void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr res
 			FString lName;
 			FString lUploadDate;
 			FString lDataType;
+			FString lDataSize;
+			// lDataSize is stored in bytes.
 			if (itemObject->TryGetStringField("id", lId) &&
 				itemObject->TryGetStringField("name", lName) &&
 				itemObject->TryGetStringField("dateAdded", lUploadDate) &&
-				itemObject->TryGetStringField("type", lDataType))
+				itemObject->TryGetStringField("type", lDataType) &&
+				itemObject->TryGetStringField("bytes", lDataSize))
 			{
-				lAsset->Construct(lId, lName, lUploadDate, lDataType);
+
+				lAsset->Construct(lId, lName, lUploadDate, lDataType, lDataSize);
 				// Skip adding assets to the list if they are components of the digital twin engine.
 				if (fIgnoredAssets.Contains(lName))
 				{
 					continue;
 				}
 				fAllAssetData.Add(lAsset);
+				UE_LOG(LogTemp, Display, TEXT("Stored asset %d of retrieved asset data \n id: %s\n name: %s\n dateAdded: %s\n type: %s\n bytes: %s\n"), fAllAssetData.Num(), *lAsset->GetId(), *lAsset->GetItemName(), *lAsset->GetUploadDate(), *lAsset->GetDataType(), *lAsset->GetDataSize());
 			}
 		}
 	}
+	RetreiveAllAssetsResponse.Broadcast();
 }
 
 void UCesiumClient::UpdateAssetActiveState(UCesiumAsset* aCesiumAsset)
 {
 	FHttpModule* Http = &FHttpModule::Get();
 	if (!Http) return;
+	if (aCesiumAsset->fId == "") return;
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 	UE_LOG(LogTemp, Error, TEXT("Passed in Asset ID: %s"), *aCesiumAsset->fId);
@@ -453,7 +459,8 @@ void UCesiumClient::LogCesiumResponse(FHttpRequestPtr request, FHttpResponsePtr 
 		UE_LOG(LogTemp, Error, TEXT("Failed to update asset data on Cesium. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
 		return;
 	}
-
+	// broadcasting to the delegate on success.
+	UpdateAssetActiveStateResponse.Broadcast();
 	UE_LOG(LogTemp, Log, TEXT("Successfully updated asset data on Cesium."));
 }
 
@@ -467,8 +474,27 @@ void UCesiumClient::DeleteAssetFromCesiumIon(UCesiumAsset* aCesiumAsset)
 	Request->SetURL("https://api.cesium.com/v1/assets/" + aCesiumAsset->fId);
 	Request->SetVerb("DELETE");
 	Request->SetHeader("Authorization", "Bearer " + fCesiumToken);
-	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::LogCesiumResponse);
+	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::DeleteAssetResponse);
 	Request->ProcessRequest();
+}
+
+void UCesiumClient::DeleteAssetResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
+{
+	if (!wasSuccessful || !response.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to update asset data on Cesium."));
+		return;
+	}
+	else if (response->GetResponseCode() != 204)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to update asset data on Cesium. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
+		return;
+	}
+	UE_LOG(LogTemp, Log, TEXT("Successfully updated asset data on Cesium."));
+	DeleteAssetFromCesiumIonResponse.Broadcast();
+	// clear our local list of assets on successful deletion, and retrieve the nw list from cesium
+	fAllAssetData.Empty();
+	RetrieveAllAssets();
 }
 
 void UCesiumClient::StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
@@ -521,16 +547,17 @@ void UCesiumClient::StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr 
 	RetrieveActiveAssetsResponse.Broadcast();
 }
 
-UCesiumAsset* UCesiumClient::GetAllAssetDataElementByDisplayName(FString aName)
+UCesiumAsset* UCesiumClient::GetAllAssetDataElementByID(FString aId)
 {
 	for (UCesiumAsset* lAsset : fAllAssetData)
 	{
-		UE_LOG(LogTemp, Log, TEXT("UCesiumAsset.displayname == aName	:	%s == %s"), *lAsset->fDisplayName, *aName);
-		if (lAsset->fDisplayName == aName)
+		if (lAsset->fId == aId)
 		{
+			UE_LOG(LogTemp, Log, TEXT("UCesiumAsset.fId == aId	:	%s == %s"), *lAsset->fId, *aId);
 			return lAsset;
 		}
 	}
+	UE_LOG(LogTemp, Log, TEXT("no match found in GetAllAssetDataElementByID: \n%s "), *aId);
 	return NewObject<UCesiumAsset>();;
 }
 

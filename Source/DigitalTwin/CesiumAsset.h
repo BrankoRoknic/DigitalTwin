@@ -18,12 +18,14 @@ public:
 	bool fCurrentlyActive;
 	FString fUploadDate;
 	FString fDataType;
+	FString fDataSize;
 
 	// Constructor
 	UCesiumAsset();
-	void Construct(FString aId, FString aItemName, FString aDate, FString aDataType);
+	void Construct(FString aId, FString aItemName, FString aDate, FString aDataType, FString aDataSize);
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Control Method")
 	bool IsActiveDifferent(bool aBool);
+
 
 	// Getters:
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Get Methods")
@@ -38,6 +40,9 @@ public:
 	FString GetUploadDate();
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Get Methods")
 	FString GetDataType();
+	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Get Methods")
+	FString GetDataSize();
+
 
 	// Setters:
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Set Methods")
@@ -50,4 +55,6 @@ public:
 	void SetUploadDate(FString aValue);
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Set Methods")
 	void SetDataType(FString aValue);
+	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Set Methods")
+	void SetDataSize(FString aValue);
 };

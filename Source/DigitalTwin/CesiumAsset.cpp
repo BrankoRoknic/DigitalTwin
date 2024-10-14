@@ -5,10 +5,16 @@
 
 UCesiumAsset::UCesiumAsset()
 {
-	fId = "Uninitialised";
+	fId = "";
+	fActualItemName = "";
+	fDisplayName = "";
+	fCurrentlyActive = false;
+	fUploadDate = "";
+	fDataType = "";
+	fDataSize = "";
 }
 
-void UCesiumAsset::Construct(FString aId, FString aItemName, FString aDate, FString aDataType)
+void UCesiumAsset::Construct(FString aId, FString aItemName, FString aDate, FString aDataType, FString aDataSize)
 {
 	fId = aId;
 	fActualItemName = aItemName;
@@ -16,6 +22,7 @@ void UCesiumAsset::Construct(FString aId, FString aItemName, FString aDate, FStr
 	fCurrentlyActive = aItemName.Contains(TEXT("active"), ESearchCase::IgnoreCase);
 	fUploadDate = aDate;
 	fDataType = aDataType;
+	fDataSize = aDataSize;
 }
 
 bool UCesiumAsset::IsActiveDifferent(bool aBool)
@@ -50,9 +57,11 @@ FString UCesiumAsset::GetUploadDate()
 	return returnValue;
 }
 FString UCesiumAsset::GetDataType() { return fDataType; }
+FString UCesiumAsset::GetDataSize() { return fDataSize; }
 
 void UCesiumAsset::SetId(FString aValue) { fId = aValue; }
 void UCesiumAsset::SetDisplayName(FString aValue) { fDisplayName = aValue; }
 void UCesiumAsset::SetCurrentlyActive(bool aValue) { fCurrentlyActive = aValue; }
 void UCesiumAsset::SetUploadDate(FString aValue) { fUploadDate = aValue; }
 void UCesiumAsset::SetDataType(FString aValue) { fDataType = aValue; }
+void UCesiumAsset::SetDataSize(FString aValue) { fDataSize = aValue; }

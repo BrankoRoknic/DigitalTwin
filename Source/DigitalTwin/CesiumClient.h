@@ -36,6 +36,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCesiumUploadCompletionResponse);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRetrieveActiveAssetsResponse);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FDeleteAssetFromCesiumIonResponse);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FUpdateAssetActiveStateResponse);
+
 UCLASS(Blueprintable)
 class DIGITALTWIN_API UCesiumClient : public UObject
 {
@@ -60,6 +64,12 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FRetrieveActiveAssetsResponse RetrieveActiveAssetsResponse;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FDeleteAssetFromCesiumIonResponse DeleteAssetFromCesiumIonResponse;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FUpdateAssetActiveStateResponse UpdateAssetActiveStateResponse;
 
 	UCesiumClient();
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Create")
@@ -87,6 +97,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Delete")
 	void DeleteAssetFromCesiumIon(UCesiumAsset* aCesiumAsset);
+	void DeleteAssetResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	TArray<FString> GetActiveTif();
@@ -95,7 +106,7 @@ public:
 	TArray<UCesiumAsset*> GetAllAssetData();
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
-	UCesiumAsset* GetAllAssetDataElementByDisplayName(FString aName);
+	UCesiumAsset* GetAllAssetDataElementByID(FString aId);
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	int32 GetAllAssetSize();
