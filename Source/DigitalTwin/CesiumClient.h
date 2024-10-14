@@ -2,6 +2,7 @@
 
 #include "Cesium3DTileset.h"
 #include "CesiumGeoreference.h"
+#include "CesiumAsset.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "HttpModule.h"
@@ -29,6 +30,16 @@ THIRD_PARTY_INCLUDES_END
 #undef UI
 #include "CesiumClient.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRetreiveAllAssetsResponse);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCesiumUploadCompletionResponse);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FRetrieveActiveAssetsResponse);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FDeleteAssetFromCesiumIonResponse);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FUpdateAssetActiveStateResponse);
+
 UCLASS(Blueprintable)
 class DIGITALTWIN_API UCesiumClient : public UObject
 {
@@ -38,39 +49,72 @@ private:
 	FString fFileName;
 	FString fNotifyCompleteURL;
 	FString fNotifyCompleteVerb;
+	TArray<FString> fIgnoredAssets;
 	TArray<FString> fActiveLas;
 	TArray<FString> fActiveTif;
-	bool fActiveFlag;
 	int32 fFileSize;
 public:
+	UPROPERTY()
+	TArray<UCesiumAsset*> fAllAssetData;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FRetreiveAllAssetsResponse RetreiveAllAssetsResponse;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnCesiumUploadCompletionResponse OnCesiumUploadCompletionResponse;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FRetrieveActiveAssetsResponse RetrieveActiveAssetsResponse;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FDeleteAssetFromCesiumIonResponse DeleteAssetFromCesiumIonResponse;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FUpdateAssetActiveStateResponse UpdateAssetActiveStateResponse;
+
 	UCesiumClient();
-	UFUNCTION(BlueprintCallable, Category = "Upload")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Create")
 	virtual void UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType);
 	void ProvideS3BucketData(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 	void OnS3UploadProgress(FHttpRequestPtr request, int32 bytesSent, int32 bytesReceived);
 	void NotifyCesiumUploadComplete(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 	void OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 
-	UFUNCTION(BlueprintCallable, Category = "List")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient List")
 	void ListAssets(bool retreiveFlag);
 	void ListResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 
-	UFUNCTION(BlueprintCallable, Category = "Retrieve")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Retrieve")
 	void RetrieveActiveAssets();
 	void StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 
-	UFUNCTION(BlueprintCallable, Category = "GetActiveAssets")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Retrieve")
+	void RetrieveAllAssets();
+	void StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Update")
+	void UpdateAssetActiveState(UCesiumAsset* aCesiumAsset);
+	void LogCesiumResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Delete")
+	void DeleteAssetFromCesiumIon(UCesiumAsset* aCesiumAsset);
+	void DeleteAssetResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	TArray<FString> GetActiveTif();
 
-	UFUNCTION(BlueprintCallable, Category = "GetActiveAssets")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
+	TArray<UCesiumAsset*> GetAllAssetData();
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
+	UCesiumAsset* GetAllAssetDataElementByID(FString aId);
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
+	int32 GetAllAssetSize();
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	TArray<FString> GetActiveLas();
 
-	UFUNCTION(BlueprintCallable, Category = "GetCesiumAccessToken")
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	FString GetCesiumToken();
-
-	UFUNCTION(BlueprintCallable, Category = "GetActiveFlag")
-	bool GetActiveFlag();
-
-	UFUNCTION(BlueprintCallable, Category = "SetActiveFlag")
-	void SetActiveFlag(bool aValue);
 };
