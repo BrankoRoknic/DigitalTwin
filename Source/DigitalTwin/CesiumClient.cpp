@@ -324,14 +324,8 @@ void UCesiumClient::ListAssets(bool retreiveFlag)
 
 	Request->SetHeader("Authorization", "Bearer " + fCesiumToken);
 
-	retreiveFlag = true; // REMOVE THIS WHEN FINISHED, JUST HERE FOR NOW
-
-	if (retreiveFlag)
-	{
-		Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::ListResponse);
-	}
+	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::ListResponse);
 	Request->ProcessRequest();
-
 }
 
 void UCesiumClient::ListResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
@@ -391,7 +385,8 @@ void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr res
 		const TSharedPtr<FJsonObject> itemObject = items[i]->AsObject();
 		if (itemObject.IsValid())
 		{
-			UCesiumAsset* lAsset = NewObject<UCesiumAsset>();
+			UCesiumAsset* lAsset = NewObject<UCesiumAsset>(this);
+			lAsset->AddToRoot(); // GC hack
 			FString lId;
 			FString lName;
 			FString lUploadDate;
@@ -423,7 +418,7 @@ void UCesiumClient::UpdateAssetActiveState(UCesiumAsset* aCesiumAsset)
 {
 	FHttpModule* Http = &FHttpModule::Get();
 	if (!Http) return;
-	if (aCesiumAsset->fId == "") return;
+	if (aCesiumAsset->fId == TEXT("")) return;
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 	UE_LOG(LogTemp, Error, TEXT("Passed in Asset ID: %s"), *aCesiumAsset->fId);
@@ -433,18 +428,18 @@ void UCesiumClient::UpdateAssetActiveState(UCesiumAsset* aCesiumAsset)
 	Request->SetHeader("Authorization", "Bearer " + fCesiumToken);
 	Request->SetHeader("Content-Type", "application/json");
 
-
 	TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
 
-	UE_LOG(LogTemp, Error, TEXT("Changing name to: %s"), *aCesiumAsset->fActualItemName);
-	JsonObject->SetStringField("name", aCesiumAsset->fActualItemName);
+	aCesiumAsset->ToggleCurrentlyActive();
+
+	UE_LOG(LogTemp, Error, TEXT("Changing name to: %s"), *aCesiumAsset->GetItemName());
+	JsonObject->SetStringField("name", aCesiumAsset->GetItemName());
 	FString RequestBody;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&RequestBody);
 	FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer);
 	Request->SetContentAsString(RequestBody);
 	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::LogCesiumResponse);
 	Request->ProcessRequest();
-	aCesiumAsset->SetCurrentlyActive(!aCesiumAsset->GetCurrentlyActive());
 }
 
 void UCesiumClient::LogCesiumResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
@@ -470,7 +465,7 @@ void UCesiumClient::DeleteAssetFromCesiumIon(UCesiumAsset* aCesiumAsset)
 	if (!Http) return;
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
-	UE_LOG(LogTemp, Error, TEXT("Passed in Asset to detele:\nID: %s\nName: %s"), *aCesiumAsset->fId, *aCesiumAsset->fActualItemName);
+	UE_LOG(LogTemp, Error, TEXT("Passed in Asset to detele:\nID: %s\nName: %s"), *aCesiumAsset->fId, *aCesiumAsset->GetDisplayName());
 	Request->SetURL("https://api.cesium.com/v1/assets/" + aCesiumAsset->fId);
 	Request->SetVerb("DELETE");
 	Request->SetHeader("Authorization", "Bearer " + fCesiumToken);
@@ -549,16 +544,18 @@ void UCesiumClient::StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr 
 
 UCesiumAsset* UCesiumClient::GetAllAssetDataElementByID(FString aId)
 {
+	UE_LOG(LogTemp, Log, TEXT("length :	%d"), fAllAssetData.Num());
 	for (UCesiumAsset* lAsset : fAllAssetData)
 	{
+		UE_LOG(LogTemp, Log, TEXT("UCesiumAsset.fId == aId	:	%s == %s"), *lAsset->fId, *aId);
 		if (lAsset->fId == aId)
 		{
-			UE_LOG(LogTemp, Log, TEXT("UCesiumAsset.fId == aId	:	%s == %s"), *lAsset->fId, *aId);
 			return lAsset;
 		}
 	}
-	UE_LOG(LogTemp, Log, TEXT("no match found in GetAllAssetDataElementByID: \n%s "), *aId);
-	return NewObject<UCesiumAsset>();;
+	UE_LOG(LogTemp, Log, TEXT("no match found in GetAllAssetDataElementByID: %s"), *aId);
+
+	return NewObject<UCesiumAsset>();
 }
 
 TArray<UCesiumAsset*> UCesiumClient::GetAllAssetData() { UE_LOG(LogTemp, Log, TEXT("fAllAssetData Length: %d"), fAllAssetData.Num());	return fAllAssetData; }

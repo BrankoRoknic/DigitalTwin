@@ -13,7 +13,6 @@ public:
 
 	// Member Variables:
 	FString fId;
-	FString fActualItemName;
 	FString fDisplayName;
 	bool fCurrentlyActive;
 	FString fUploadDate;
@@ -25,6 +24,8 @@ public:
 	void Construct(FString aId, FString aItemName, FString aDate, FString aDataType, FString aDataSize);
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Control Method")
 	bool IsActiveDifferent(bool aBool);
+
+	virtual void BeginDestroy() override;
 
 
 	// Getters:
@@ -57,4 +58,6 @@ public:
 	void SetDataType(FString aValue);
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Set Methods")
 	void SetDataSize(FString aValue);
+	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Set Methods")
+	void ToggleCurrentlyActive();
 };

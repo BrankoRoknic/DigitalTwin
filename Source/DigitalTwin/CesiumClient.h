@@ -50,11 +50,12 @@ private:
 	FString fNotifyCompleteURL;
 	FString fNotifyCompleteVerb;
 	TArray<FString> fIgnoredAssets;
-	TArray<UCesiumAsset*> fAllAssetData;
 	TArray<FString> fActiveLas;
 	TArray<FString> fActiveTif;
 	int32 fFileSize;
 public:
+	UPROPERTY()
+	TArray<UCesiumAsset*> fAllAssetData;
 
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FRetreiveAllAssetsResponse RetreiveAllAssetsResponse;
