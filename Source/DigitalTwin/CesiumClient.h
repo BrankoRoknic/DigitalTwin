@@ -53,6 +53,9 @@ private:
 	TArray<FString> fActiveLas;
 	TArray<FString> fActiveTif;
 	int32 fFileSize;
+	// Ini Section and Key Constants
+	const FString ConfigSection = TEXT("/Script/DigitalTwin.CesiumConfigSection");
+	const FString ConfigKey = TEXT("CesiumIonToken");
 public:
 	UPROPERTY()
 	TArray<UCesiumAsset*> fAllAssetData;
@@ -117,4 +120,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	FString GetCesiumToken();
+	// New methods
+	FString LoadCesiumTokenFromConfig();
+	void SetCesiumToken(FString NewToken);
 };
