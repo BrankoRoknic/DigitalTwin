@@ -77,9 +77,17 @@ UCesiumClient::UCesiumClient()
     // LOG_CODE_5001: UCesiumClient constructor called
     UE_LOG(LogTemp, Log, TEXT("LOG_CODE_5001: UCesiumClient constructor called."));
 
-    // Set the Cesium token
-    fCesiumToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwM2MzYTRlNC04MzMzLTRhMDktODVjZS00Mjc0NWRjNGYyNjAiLCJpZCI6MjEzODI0LCJpYXQiOjE3MjE5ODk4MjV9.aDuw8NxL3XgyrWkZ7oqmhX6ImPXJgUG8ZCnxu--UPDs";
+	// Load the Cesium Ion token from the config file
+	fCesiumToken = LoadCesiumTokenFromConfig();
 
+	if (fCesiumToken.IsEmpty())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Cesium token is missing! Please set it in the configuration file."));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Cesium token loaded successfully."));
+	}
     // LOG_CODE_5002: Cesium token set
     UE_LOG(LogTemp, Log, TEXT("LOG_CODE_5002: Cesium token set successfully."));
 
@@ -94,7 +102,29 @@ UCesiumClient::UCesiumClient()
     // LOG_CODE_5003: Ignored assets initialized
     UE_LOG(LogTemp, Log, TEXT("LOG_CODE_5003: Ignored assets array initialized with default assets."));
 }
+// Function to load the Cesium Ion token from the config file
+FString UCesiumClient::LoadCesiumTokenFromConfig()
+{
+	FString Token;
+	if (GConfig)
+	{
+		// Read the token from the DefaultGame.ini file
+		GConfig->GetString(*ConfigSection, *ConfigKey, Token, GGameIni);
+	}
+	return Token;
+}
 
+// Function to set and save the Cesium Ion token in the config file
+void UCesiumClient::SetCesiumToken(FString NewToken)
+{
+	fCesiumToken = NewToken;
+
+	if (GConfig)
+	{
+		GConfig->SetString(*ConfigSection, *ConfigKey, *NewToken, GGameIni);
+		GConfig->Flush(false, GGameIni);  // Save changes to the config file
+	}
+}
 
 void UCesiumClient::UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType)
 {
