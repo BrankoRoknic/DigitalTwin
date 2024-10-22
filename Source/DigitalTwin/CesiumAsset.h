@@ -19,14 +19,15 @@ public:
 	FString fDataType;
 	FString fDataSize;
 
-	// Constructor
+	// Constructor Methods:
 	UCesiumAsset();
+	virtual void BeginDestroy() override;
 	void Construct(FString aId, FString aItemName, FString aDate, FString aDataType, FString aDataSize);
+
+	// Generic Object Methods:
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Control Method")
 	bool IsActiveDifferent(bool aBool);
-
-	virtual void BeginDestroy() override;
-
+	FString ByteSizeStringToGb(FString aByteSize);
 
 	// Getters:
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Get Methods")

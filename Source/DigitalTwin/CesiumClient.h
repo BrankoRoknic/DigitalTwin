@@ -52,6 +52,7 @@ private:
 	FString fFileName;
 	FString fNotifyCompleteURL;
 	FString fNotifyCompleteVerb;
+	double fSpaceUsed;
 	TArray<FString> fIgnoredAssets;
 	TArray<FString> fActiveLas;
 	TArray<FString> fActiveTif;
@@ -123,4 +124,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	FString GetCesiumToken();
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
+	FString GetSpaceAvailableAsString();
+	void AddToSpaceUsed(FString aSize);
 };

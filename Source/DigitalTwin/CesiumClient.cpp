@@ -76,7 +76,7 @@ UCesiumClient::UCesiumClient()
 {
 	// This field variable contains the access key from Cesium
 	fCesiumToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwM2MzYTRlNC04MzMzLTRhMDktODVjZS00Mjc0NWRjNGYyNjAiLCJpZCI6MjEzODI0LCJpYXQiOjE3MjE5ODk4MjV9.aDuw8NxL3XgyrWkZ7oqmhX6ImPXJgUG8ZCnxu--UPDs";
-
+	fSpaceUsed = 0;
 	// Create a TArray of FStrings containing the names of all default assets from cesium that are used in the digital twin engine,
 	// this is so that they can be removed from client facing lists so they cannot be accidentally deleted.
 	fIgnoredAssets.Add(FString("Cesium World Terrain"));
@@ -400,6 +400,7 @@ void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr res
 				itemObject->TryGetStringField("type", lDataType) &&
 				itemObject->TryGetStringField("bytes", lDataSize))
 			{
+				AddToSpaceUsed(lDataSize);
 				lAsset->Construct(lId, lName, lUploadDate, lDataType, lDataSize);
 				if (!fIgnoredAssets.Contains(lName))
 				{
@@ -565,4 +566,10 @@ TArray<FString> UCesiumClient::GetActiveTif() { UE_LOG(LogTemp, Log, TEXT("fActi
 TArray<FString> UCesiumClient::GetActiveLas() { UE_LOG(LogTemp, Log, TEXT("fActiveLas Length: %d"), fActiveLas.Num());	return fActiveLas; }
 
 FString UCesiumClient::GetCesiumToken() { return fCesiumToken; }
+
+FString UCesiumClient::GetSpaceAvailableAsString() { return FString::Printf(TEXT(" %.4f GB"), (5 - fSpaceUsed)); }
+void UCesiumClient::AddToSpaceUsed(FString aSize)
+{
+	fSpaceUsed += (FCString::Atof(*aSize) / (1024 * 1024 * 1024));
+}
 
