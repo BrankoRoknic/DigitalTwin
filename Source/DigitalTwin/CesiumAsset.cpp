@@ -61,7 +61,7 @@ void UCesiumAsset::SetDataType(FString aValue) { fDataType = aValue; }
 void UCesiumAsset::SetDataSize(FString aValue) { fDataSize = aValue; }
 
 void UCesiumAsset::BeginDestroy() {
-	UE_LOG(LogTemp, Error, TEXT("Death star activating: %s"), *fId);
+	UE_LOG(LogTemp, Error, TEXT("CesiumAsset being garbage collected, ID: %s"), *fId);
 
 	Super::BeginDestroy();
 }

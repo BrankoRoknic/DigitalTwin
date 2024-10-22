@@ -87,6 +87,13 @@ UCesiumClient::UCesiumClient()
 	fIgnoredAssets.Add(FString("Google Photorealistic 3D Tiles"));
 }
 
+// Override BeginDestroy to handle cleanup
+void UCesiumClient::BeginDestroy()
+{
+	fAllAssetData.Empty(); // This will allow garbage collection of the UObjects
+	Super::BeginDestroy();
+}
+
 void UCesiumClient::UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType)
 {
 
@@ -380,34 +387,25 @@ void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr res
 	}
 
 	const TArray<TSharedPtr<FJsonValue, ESPMode::ThreadSafe>> items = jsonObject->GetArrayField("items");
-	for (int i = 0; i < items.Num(); i++)
+	for (const TSharedPtr<FJsonValue>& item : items)
 	{
-		const TSharedPtr<FJsonObject> itemObject = items[i]->AsObject();
+		const TSharedPtr<FJsonObject> itemObject = item->AsObject();
 		if (itemObject.IsValid())
 		{
 			UCesiumAsset* lAsset = NewObject<UCesiumAsset>(this);
-			lAsset->AddToRoot(); // GC hack
-			FString lId;
-			FString lName;
-			FString lUploadDate;
-			FString lDataType;
-			FString lDataSize;
-			// lDataSize is stored in bytes.
+			FString lId, lName, lUploadDate, lDataType, lDataSize;
 			if (itemObject->TryGetStringField("id", lId) &&
 				itemObject->TryGetStringField("name", lName) &&
 				itemObject->TryGetStringField("dateAdded", lUploadDate) &&
 				itemObject->TryGetStringField("type", lDataType) &&
 				itemObject->TryGetStringField("bytes", lDataSize))
 			{
-
 				lAsset->Construct(lId, lName, lUploadDate, lDataType, lDataSize);
-				// Skip adding assets to the list if they are components of the digital twin engine.
-				if (fIgnoredAssets.Contains(lName))
+				if (!fIgnoredAssets.Contains(lName))
 				{
-					continue;
+					fAllAssetData.Add(lAsset); // Add the asset to the array
+					UE_LOG(LogTemp, Display, TEXT("Stored asset %d of retrieved asset data \n id: %s\n name: %s\n dateAdded: %s\n type: %s\n bytes: %s\n"), fAllAssetData.Num(), *lAsset->GetId(), *lAsset->GetItemName(), *lAsset->GetUploadDate(), *lAsset->GetDataType(), *lAsset->GetDataSize());
 				}
-				fAllAssetData.Add(lAsset);
-				UE_LOG(LogTemp, Display, TEXT("Stored asset %d of retrieved asset data \n id: %s\n name: %s\n dateAdded: %s\n type: %s\n bytes: %s\n"), fAllAssetData.Num(), *lAsset->GetId(), *lAsset->GetItemName(), *lAsset->GetUploadDate(), *lAsset->GetDataType(), *lAsset->GetDataSize());
 			}
 		}
 	}

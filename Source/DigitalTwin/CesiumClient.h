@@ -76,6 +76,9 @@ public:
 	FUpdateAssetActiveStateResponse UpdateAssetActiveStateResponse;
 
 	UCesiumClient();
+	// Override BeginDestroy to handle cleanup
+	virtual void BeginDestroy() override;
+
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Create")
 	virtual void UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType);
 	void ProvideS3BucketData(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
