@@ -387,6 +387,9 @@ void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr res
 	}
 
 	const TArray<TSharedPtr<FJsonValue, ESPMode::ThreadSafe>> items = jsonObject->GetArrayField("items");
+
+	// Reset fSpaceUsed to 0 before entering the next for loop if it has already been calculated in this objects lifecycle
+	fSpaceUsed = 0;
 	for (const TSharedPtr<FJsonValue>& item : items)
 	{
 		const TSharedPtr<FJsonObject> itemObject = item->AsObject();
