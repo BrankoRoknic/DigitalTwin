@@ -361,7 +361,29 @@ void UCesiumClient::RetrieveActiveAssets()
 	Request->SetHeader("Authorization", "Bearer " + fCesiumToken);
 
 	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::StoreActiveAssets);
+	SetRequestTimeout(Request, fRequestTimeoutSeconds);
 	Request->ProcessRequest();
+}
+
+void UCesiumClient::SetRequestTimeout(FHttpRequestPtr Request, float TimeoutInSeconds)
+{
+	// Set a timer to manually handle request timeout (Unreal doesn't natively support it)
+	FTimerHandle TimeoutHandle;
+	GWorld->GetTimerManager().SetTimer(
+		TimeoutHandle,
+		FTimerDelegate::CreateLambda([Request, this]()
+			{
+				if (Request.IsValid() && !Request->GetResponse().IsValid())
+				{
+					UE_LOG(LogTemp, Warning, TEXT("HTTP Request timed out."));
+					Request->CancelRequest();
+					// Broadcast to Abort Level Load Delegate Here
+					NoActiveAssetResponse.Broadcast();
+				}
+			}),
+		TimeoutInSeconds,
+		false
+	);
 }
 
 void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)

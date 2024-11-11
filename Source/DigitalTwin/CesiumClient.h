@@ -43,11 +43,14 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FDeleteAssetFromCesiumIonResponse);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FUpdateAssetActiveStateResponse);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FNoActiveAssetResponse);
+
 UCLASS(Blueprintable)
 class DIGITALTWIN_API UCesiumClient : public UObject
 {
 	GENERATED_BODY()
 private:
+	const float fRequestTimeoutSeconds = 20.0f;
 	FString fCesiumToken;
 	FString fFileName;
 	FString fNotifyCompleteURL;
@@ -77,6 +80,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FUpdateAssetActiveStateResponse UpdateAssetActiveStateResponse;
 
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FNoActiveAssetResponse NoActiveAssetResponse;
+
 	UCesiumClient();
 	// Override BeginDestroy to handle cleanup
 	virtual void BeginDestroy() override;
@@ -94,6 +100,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Retrieve")
 	void RetrieveActiveAssets();
+	void SetRequestTimeout(FHttpRequestPtr Request, float TimeoutInSeconds);
 	void StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Retrieve")
