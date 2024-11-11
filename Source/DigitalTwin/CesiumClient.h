@@ -57,6 +57,7 @@ private:
 	TArray<FString> fActiveLas;
 	TArray<FString> fActiveTif;
 	int32 fFileSize;
+	FHttpModule* Http;
 public:
 	UPROPERTY()
 	TArray<UCesiumAsset*> fAllAssetData;

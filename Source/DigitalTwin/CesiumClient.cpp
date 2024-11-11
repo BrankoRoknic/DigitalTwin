@@ -85,6 +85,8 @@ UCesiumClient::UCesiumClient()
 	fIgnoredAssets.Add(FString("Bing Maps Road"));
 	fIgnoredAssets.Add(FString("Cesium OSM Buildings"));
 	fIgnoredAssets.Add(FString("Google Photorealistic 3D Tiles"));
+
+	Http = &FHttpModule::Get();
 }
 
 // Override BeginDestroy to handle cleanup
@@ -96,11 +98,6 @@ void UCesiumClient::BeginDestroy()
 
 void UCesiumClient::UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType)
 {
-
-	// Get the HTTP module
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http) return;
-
 	// Create the HTTP request
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 	Request->SetURL("https://api.cesium.com/v1/assets");
@@ -216,10 +213,6 @@ void UCesiumClient::ProvideS3BucketData(FHttpRequestPtr request, FHttpResponsePt
 	// Prepare the PUT request
 	FString contentType = "application/octet-stream";
 
-	// Get the HTTP module
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http) return;
-
 	// Create the HTTP request
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 
@@ -286,8 +279,6 @@ void UCesiumClient::NotifyCesiumUploadComplete(FHttpRequestPtr request, FHttpRes
 	UE_LOG(LogTemp, Log, TEXT("File successfully uploaded to S3."));
 
 	// Notify cesium that the upload is complete here
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http) return;
 
 	// Create the HTTP request
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
@@ -306,7 +297,6 @@ void UCesiumClient::OnS3UploadProgress(FHttpRequestPtr request, int32 bytesSent,
 
 void UCesiumClient::OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
 {
-	OnCesiumUploadCompletionResponse.Broadcast();
 	if (!wasSuccessful || !response.IsValid())
 	{
 		UE_LOG(LogTemp, Error, TEXT("Failed to notify Cesium."));
@@ -317,14 +307,12 @@ void UCesiumClient::OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpRespo
 		UE_LOG(LogTemp, Error, TEXT("Failed to notify Cesium. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
 		return;
 	}
+	OnCesiumUploadCompletionResponse.Broadcast();
 	UE_LOG(LogTemp, Log, TEXT("Successfully notified Cesium of file upload."));
 }
 
 void UCesiumClient::ListAssets(bool retreiveFlag)
 {
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http) return;
-
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 	Request->SetURL("https://api.cesium.com/v1/assets");
 	Request->SetVerb("GET");
@@ -337,15 +325,23 @@ void UCesiumClient::ListAssets(bool retreiveFlag)
 
 void UCesiumClient::ListResponse(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
 {
+	if (!wasSuccessful || !response.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to list all assets from Cesium."));
+		return;
+	}
+	else if (response->GetResponseCode() != 200)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to list all assets from Cesium. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
+		return;
+	}
+
 	FString data = response->GetContentAsString();
 	UE_LOG(LogTemp, Display, TEXT("HTTP GET response from Cesium: %s"), *data);
 }
 
 void UCesiumClient::RetrieveAllAssets()
 {
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http) return;
-
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 	Request->SetURL("https://api.cesium.com/v1/assets");
 	Request->SetVerb("GET");
@@ -358,9 +354,6 @@ void UCesiumClient::RetrieveAllAssets()
 
 void UCesiumClient::RetrieveActiveAssets()
 {
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http) return;
-
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 	Request->SetURL("https://api.cesium.com/v1/assets?search=ACTIVE");
 	Request->SetVerb("GET");
@@ -373,6 +366,17 @@ void UCesiumClient::RetrieveActiveAssets()
 
 void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
 {
+	if (!wasSuccessful || !response.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to retrieve all assets from Cesium."));
+		return;
+	}
+	else if (response->GetResponseCode() != 200)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to retrieve all assets from Cesium. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
+		return;
+	}
+
 	FString data = response->GetContentAsString();
 	UE_LOG(LogTemp, Display, TEXT("HTTP GET response from Cesium: %s"), *data);
 
@@ -418,8 +422,6 @@ void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr res
 
 void UCesiumClient::UpdateAssetActiveState(UCesiumAsset* aCesiumAsset)
 {
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http) return;
 	if (aCesiumAsset->fId == TEXT("")) return;
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
@@ -463,9 +465,6 @@ void UCesiumClient::LogCesiumResponse(FHttpRequestPtr request, FHttpResponsePtr 
 
 void UCesiumClient::DeleteAssetFromCesiumIon(UCesiumAsset* aCesiumAsset)
 {
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http) return;
-
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 	UE_LOG(LogTemp, Error, TEXT("Passed in Asset to detele:\nID: %s\nName: %s"), *aCesiumAsset->fId, *aCesiumAsset->GetDisplayName());
 	Request->SetURL("https://api.cesium.com/v1/assets/" + aCesiumAsset->fId);
@@ -496,6 +495,17 @@ void UCesiumClient::DeleteAssetResponse(FHttpRequestPtr request, FHttpResponsePt
 
 void UCesiumClient::StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
 {
+	if (!wasSuccessful || !response.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to retrieve active assets from Cesium."));
+		return;
+	}
+	else if (response->GetResponseCode() != 200)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to  retrieve active assets from Cesium. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
+		return;
+	}
+
 	FString data = response->GetContentAsString();
 	UE_LOG(LogTemp, Display, TEXT("HTTP GET response from Cesium: %s"), *data);
 
