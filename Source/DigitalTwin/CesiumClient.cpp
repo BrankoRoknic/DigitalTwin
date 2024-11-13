@@ -79,6 +79,7 @@ UCesiumClient::UCesiumClient()
 	// Set the Cesium token
 	fCesiumToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwM2MzYTRlNC04MzMzLTRhMDktODVjZS00Mjc0NWRjNGYyNjAiLCJpZCI6MjEzODI0LCJpYXQiOjE3MjE5ODk4MjV9.aDuw8NxL3XgyrWkZ7oqmhX6ImPXJgUG8ZCnxu--UPDs";
 	fSpaceUsed = 0;
+	fUploadPercentage = 0;
 	// Create a TArray of FStrings containing the names of all default assets from cesium that are used in the digital twin engine,
 	// this is so that they can be removed from client facing lists so they cannot be accidentally deleted.
 
@@ -340,9 +341,22 @@ void UCesiumClient::OnS3UploadProgress(FHttpRequestPtr request, int32 bytesSent,
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::OnS3UploadProgress: Method called."));
 
 	float percentage = 100.f * bytesSent / fFileSize;
+	fUploadPercentage = percentage;
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::OnS3UploadProgress: S3 upload progress: %d/%d (%.0f%%)"), bytesSent, fFileSize, percentage);
 
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::OnS3UploadProgress: Bytes received during upload: %d bytes"), bytesReceived);
+}
+
+void UCesiumClient::SetUploadPercentage(float aPercentage)
+{
+	fUploadPercentage = aPercentage;
+	UploadPercentageUpdated.Broadcast();
+}
+
+
+float UCesiumClient::GetUploadPercentage()
+{
+	return fUploadPercentage;
 }
 
 

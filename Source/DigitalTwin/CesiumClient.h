@@ -45,6 +45,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FUpdateAssetActiveStateResponse);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FNoActiveAssetResponse);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FUploadPercentageResponse);
+
+
+
 UCLASS(Blueprintable)
 class DIGITALTWIN_API UCesiumClient : public UObject
 {
@@ -55,6 +59,7 @@ private:
 	FString fFileName;
 	FString fNotifyCompleteURL;
 	FString fNotifyCompleteVerb;
+	float fUploadPercentage;
 	double fSpaceUsed;
 	TArray<FString> fIgnoredAssets;
 	TArray<FString> fActiveLas;
@@ -64,6 +69,9 @@ private:
 public:
 	UPROPERTY()
 	TArray<UCesiumAsset*> fAllAssetData;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FUploadPercentageResponse UploadPercentageUpdated;
 
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FRetreiveAllAssetsResponse RetreiveAllAssetsResponse;
@@ -134,6 +142,13 @@ public:
 	FString GetCesiumToken();
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
+	float GetUploadPercentage();
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	FString GetSpaceAvailableAsString();
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Set Methods")
+	void SetUploadPercentage(float aPercentage);
+
 	void AddToSpaceUsed(FString aSize);
 };
