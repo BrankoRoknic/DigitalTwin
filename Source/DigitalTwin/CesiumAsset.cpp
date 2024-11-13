@@ -56,7 +56,7 @@ FString UCesiumAsset::GetId() {
 	return fId;
 }
 
-FString UCesiumAsset::GetItemName() 
+FString UCesiumAsset::GetItemName()
 {
 	FString result = (fCurrentlyActive ? TEXT("ACTIVE") : TEXT("")) + fDisplayName;
 
@@ -74,8 +74,8 @@ FString UCesiumAsset::GetDisplayName() {
 
 FString UCesiumAsset::ByteSizeStringToGb(FString aByteSize)
 {
-  UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::ByteSizeStringToGb: Method called. aByteSize: %s"), *aByteSize);
-  
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::ByteSizeStringToGb: Method called. aByteSize: %s"), *aByteSize);
+
 	// Convert the FString to double
 	double byteSize = FCString::Atof(*aByteSize);
 
@@ -85,8 +85,6 @@ FString UCesiumAsset::ByteSizeStringToGb(FString aByteSize)
 	// Convert the result back to FString
 	return FString::Printf(TEXT("%.2f GB"), gigabytes); // Format to 2 decimal places
 }
-
-void UCesiumAsset::ToggleCurrentlyActive() { fCurrentlyActive = !fCurrentlyActive; }
 
 FString UCesiumAsset::GetUploadDate()
 {
@@ -110,22 +108,22 @@ FString UCesiumAsset::GetUploadDate()
 	return returnValue;
 }
 
-FString UCesiumAsset::GetDataType() { 
+FString UCesiumAsset::GetDataType() {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::GetDataType: Method called. DataType: %s"), *fDataType);
 	return fDataType;
 }
 
-FString UCesiumAsset::GetDataSize() { 
+FString UCesiumAsset::GetDataSize() {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::GetDataSize: Method called. DataSize: %s"), *fDataSize);
 	return fDataSize;
 }
 
-void UCesiumAsset::SetId(FString aValue) { 
+void UCesiumAsset::SetId(FString aValue) {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::SetId: Method called. New ID: %s"), *aValue);
 	fId = aValue;
 }
 
-void UCesiumAsset::SetDisplayName(FString aValue) 
+void UCesiumAsset::SetDisplayName(FString aValue)
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::SetDisplayName: Method called. New DisplayName: %s"), *aValue);
 
@@ -133,28 +131,28 @@ void UCesiumAsset::SetDisplayName(FString aValue)
 }
 
 
-void UCesiumAsset::SetCurrentlyActive(bool aValue) 
+void UCesiumAsset::SetCurrentlyActive(bool aValue)
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::SetCurrentlyActive: Method called. New CurrentlyActive status: %s"), aValue ? TEXT("true") : TEXT("false"));
 
 	fCurrentlyActive = aValue;
 }
 
-void UCesiumAsset::SetUploadDate(FString aValue) 
+void UCesiumAsset::SetUploadDate(FString aValue)
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::SetUploadDate: Method called. New UploadDate: %s"), *aValue);
 
 	fUploadDate = aValue;
 }
 
-void UCesiumAsset::SetDataType(FString aValue) 
+void UCesiumAsset::SetDataType(FString aValue)
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::SetDataType: Method called. New DataType: %s"), *aValue);
 
 	fDataType = aValue;
 }
 
-void UCesiumAsset::SetDataSize(FString aValue) 
+void UCesiumAsset::SetDataSize(FString aValue)
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::SetDataSize: Method called. New DataSize: %s"), *aValue);
 
