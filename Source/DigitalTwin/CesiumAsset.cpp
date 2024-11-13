@@ -43,6 +43,10 @@ bool UCesiumAsset::IsActiveDifferent(bool aBool)
 	return result;
 }
 
+bool UCesiumAsset::GetCurrentlyActive() {
+	return fCurrentlyActive;
+}
+
 void UCesiumAsset::ToggleCurrentlyActive()
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::ToggleCurrentlyActive: Method called."));

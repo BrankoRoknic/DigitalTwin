@@ -37,6 +37,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Get Methods")
 	FString GetDisplayName();
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Get Methods")
+	bool GetCurrentlyActive();
+	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Get Methods")
 	FString GetUploadDate();
 	UFUNCTION(BlueprintCallable, Category = "CesiumAsset Get Methods")
 	FString GetDataType();
