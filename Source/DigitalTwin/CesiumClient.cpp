@@ -78,8 +78,9 @@ UCesiumClient::UCesiumClient()
 
 	// Set the Cesium token
 	fCesiumToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwM2MzYTRlNC04MzMzLTRhMDktODVjZS00Mjc0NWRjNGYyNjAiLCJpZCI6MjEzODI0LCJpYXQiOjE3MjE5ODk4MjV9.aDuw8NxL3XgyrWkZ7oqmhX6ImPXJgUG8ZCnxu--UPDs";
-
-	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UCesiumClient: Cesium token set successfully."));
+	fSpaceUsed = 0;
+	// Create a TArray of FStrings containing the names of all default assets from cesium that are used in the digital twin engine,
+	// this is so that they can be removed from client facing lists so they cannot be accidentally deleted.
 
 	// Add default ignored assets to the ignored assets array
 	fIgnoredAssets.Add(FString("Cesium World Terrain"));
@@ -90,268 +91,248 @@ UCesiumClient::UCesiumClient()
 	fIgnoredAssets.Add(FString("Google Photorealistic 3D Tiles"));
 
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UCesiumClient: Ignored assets array initialized with default assets."));
+
+	Http = &FHttpModule::Get();
 }
 
+// Override BeginDestroy to handle cleanup
+void UCesiumClient::BeginDestroy()
+{
+	fAllAssetData.Empty(); // This will allow garbage collection of the UObjects
+	Super::BeginDestroy();
+}
 
 void UCesiumClient::UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType)
 {
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: Method called with parameters - aFile: %s, aName: %s, aConversionType: %s, aProvidedDataType: %s"), *aFile, *aName, *aConversionType, *aProvidedDataType);
+	// Create the HTTP request
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+	Request->SetURL("https://api.cesium.com/v1/assets");
+	Request->SetVerb("POST");
 
-    // Get the HTTP module
-    FHttpModule* Http = &FHttpModule::Get();
-    if (!Http)
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::UploadFile: Failed to retrieve HTTP module."));
-        return;
-    }
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: HTTP module successfully retrieved."));
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: HTTP POST request created for URL: https://api.cesium.com/v1/assets"));
 
-    // Create the HTTP request
-    TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
-    Request->SetURL("https://api.cesium.com/v1/assets");
-    Request->SetVerb("POST");
+	// Set headers
+	FString token = "Bearer " + this->fCesiumToken;
+	Request->SetHeader("Authorization", token);
+	Request->SetHeader("Content-Type", "application/json");
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: HTTP POST request created for URL: https://api.cesium.com/v1/assets"));
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: Headers set for HTTP request. Authorization: %s, Content-Type: application/json"), *token);
 
-    // Set headers
-    FString token = "Bearer " + this->fCesiumToken;
-    Request->SetHeader("Authorization", token);
-    Request->SetHeader("Content-Type", "application/json");
+	// Set request payload
+	char* lPath = TCHAR_TO_ANSI(*aFile);
+	std::filesystem::path p(lPath);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: Headers set for HTTP request. Authorization: %s, Content-Type: application/json"), *token);
+	FString fileName = p.stem().string().c_str();
 
-    // Set request payload
-    char* lPath = TCHAR_TO_ANSI(*aFile);
-    std::filesystem::path p(lPath);
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: Processed file name from path: %s"), *fileName);
 
-    FString fileName = p.stem().string().c_str();
+	TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
+	JsonObject->SetStringField("name", fileName);
+	JsonObject->SetStringField("description", "");
+	JsonObject->SetStringField("type", aConversionType);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: Processed file name from path: %s"), *fileName);
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: JSON object created with name: %s, type: %s"), *fileName, *aConversionType);
 
-    TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
-    JsonObject->SetStringField("name", fileName);
-    JsonObject->SetStringField("description", "");
-    JsonObject->SetStringField("type", aConversionType);
+	TSharedPtr<FJsonObject> OptionsObject = MakeShareable(new FJsonObject);
+	OptionsObject->SetStringField("sourceType", aProvidedDataType);
+	JsonObject->SetObjectField("options", OptionsObject);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: JSON object created with name: %s, type: %s"), *fileName, *aConversionType);
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: Options JSON object added with sourceType: %s"), *aProvidedDataType);
 
-    TSharedPtr<FJsonObject> OptionsObject = MakeShareable(new FJsonObject);
-    OptionsObject->SetStringField("sourceType", aProvidedDataType);
-    JsonObject->SetObjectField("options", OptionsObject);
+	FString RequestBody;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&RequestBody);
+	FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: Options JSON object added with sourceType: %s"), *aProvidedDataType);
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: JSON payload serialized successfully: %s"), *RequestBody);
 
-    FString RequestBody;
-    TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&RequestBody);
-    FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer);
+	Request->SetContentAsString(RequestBody);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: JSON payload serialized successfully: %s"), *RequestBody);
+	// Bind the response callback
+	this->fFileName = aFile;
+	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::ProvideS3BucketData);
 
-    Request->SetContentAsString(RequestBody);
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: Response callback bound to ProvideS3BucketData."));
 
-    // Bind the response callback
-    this->fFileName = aFile;
-    Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::ProvideS3BucketData);
-
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UploadFile: Response callback bound to ProvideS3BucketData."));
-
-    // Execute the request
-    Request->ProcessRequest();
+	// Execute the request
+	Request->ProcessRequest();
 }
 
 
 void UCesiumClient::ProvideS3BucketData(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
 {
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: Method called."));
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: Method called."));
 
-    if (!wasSuccessful || !response.IsValid())
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::ProvideS3BucketData: Failed to start upload with Cesium."));
-        return;
-    }
-    else if (response->GetResponseCode() != 200)
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::ProvideS3BucketData: Non-200 response code from Cesium. Response code: %d, Content: %s"), response->GetResponseCode(), *response->GetContentAsString());
-        return;
-    }
-
-    FString data = response->GetContentAsString();
-    UE_LOG(LogTemp, Display, TEXT("INFO: UCesiumClient::ProvideS3BucketData: Valid HTTP response received from Cesium. Response: %s"), *data);
-
-    // Parse the JSON response
-    TSharedRef<TJsonReader<TCHAR>> jsonReader = TJsonReaderFactory<TCHAR>::Create(data);
-    TSharedPtr<FJsonObject> jsonObject;
-
-    if (!FJsonSerializer::Deserialize(jsonReader, jsonObject) || !jsonObject.IsValid())
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::ProvideS3BucketData: Failed to parse JSON."));
-        return;
-    }
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: JSON parsed successfully."));
-
-    // Set some field variables to be used in a later step from this response - Notify cesium on upload complete.
-    TSharedPtr<FJsonObject> onComplete = jsonObject->GetObjectField("onComplete");
-    fNotifyCompleteVerb = onComplete->GetStringField("method");
-    fNotifyCompleteURL = onComplete->GetStringField("url");
-
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: OnComplete - Method: %s, URL: %s"), *fNotifyCompleteVerb, *fNotifyCompleteURL);
-
-    // Set some local variables to be used in constructing the S3 API Request
-    TSharedPtr<FJsonObject> uploadLocation = jsonObject->GetObjectField("uploadLocation");
-    FString endpoint = uploadLocation->GetStringField("endpoint");
-    FString bucket = uploadLocation->GetStringField("bucket");
-    FString prefix = uploadLocation->GetStringField("prefix");
-    FString accessKey = uploadLocation->GetStringField("accessKey");
-    FString secretAccessKey = uploadLocation->GetStringField("secretAccessKey");
-    FString sessionToken = uploadLocation->GetStringField("sessionToken");
-
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: UploadLocation - Endpoint: %s, Bucket: %s, Prefix: %s, AccessKey: %s, SecretAccessKey: %s, SessionToken: %s"), *endpoint, *bucket, *prefix, *accessKey, *secretAccessKey, *sessionToken);
-
-    // Ensure the file exists
-    FString filePath = this->fFileName;
-    if (!FPaths::FileExists(filePath))
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::ProvideS3BucketData: File not found: %s"), *filePath);
-        return;
-    }
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: File found at path: %s"), *filePath);
-
-    // Load file content
-    TArray<uint8> fileContent;
-    if (!FFileHelper::LoadFileToArray(fileContent, *filePath))
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::ProvideS3BucketData: Failed to load file: %s"), *filePath);
-        return;
-    }
-    fFileSize = fileContent.Num();
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: File loaded successfully. File size: %d bytes"), fFileSize);
-
-    // Get file name and S3 path
-    FString FileName = FPaths::GetCleanFilename(filePath);
-    FString S3Path = FString::Printf(TEXT("%s%s"), *prefix, *FileName);
-
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: S3Path generated: %s"), *S3Path);
-
-    // Generate the S3 URL
-    FString S3Url = FString::Printf(TEXT("https://%s.s3.amazonaws.com/%s"), *bucket, *S3Path);
-
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: S3 URL generated: %s"), *S3Url);
-
-    // Prepare the PUT request
-    FString contentType = "application/octet-stream";
-    FHttpModule* Http = &FHttpModule::Get();
-	if (!Http)
+	if (!wasSuccessful || !response.IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::ProvideS3BucketData: HTTP module not found."));
+		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::ProvideS3BucketData: Failed to start upload with Cesium."));
+		return;
+	}
+	else if (response->GetResponseCode() != 200)
+	{
+		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::ProvideS3BucketData: Non-200 response code from Cesium. Response code: %d, Content: %s"), response->GetResponseCode(), *response->GetContentAsString());
 		return;
 	}
 
+	FString data = response->GetContentAsString();
+	UE_LOG(LogTemp, Display, TEXT("INFO: UCesiumClient::ProvideS3BucketData: Valid HTTP response received from Cesium. Response: %s"), *data);
 
-    TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
-    FString url = endpoint + S3Path;
+	// Parse the JSON response
+	TSharedRef<TJsonReader<TCHAR>> jsonReader = TJsonReaderFactory<TCHAR>::Create(data);
+	TSharedPtr<FJsonObject> jsonObject;
 
-    Request->SetURL(url);
-    Request->SetVerb("PUT");
-    Request->SetHeader("Host", bucket + ".s3.amazonaws.com");
-    Request->SetHeader("Content-Type", contentType);
-    Request->SetContent(fileContent);
+	if (!FJsonSerializer::Deserialize(jsonReader, jsonObject) || !jsonObject.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::ProvideS3BucketData: Failed to parse JSON."));
+		return;
+	}
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: JSON parsed successfully."));
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: PUT request prepared for S3 upload. URL: %s, Content-Type: %s"), *url, *contentType);
+	// Set some field variables to be used in a later step from this response - Notify cesium on upload complete.
+	TSharedPtr<FJsonObject> onComplete = jsonObject->GetObjectField("onComplete");
+	fNotifyCompleteVerb = onComplete->GetStringField("method");
+	fNotifyCompleteURL = onComplete->GetStringField("url");
 
-    // AWS Signature Version 4 signing process
-    FString httpDate = FDateTime::UtcNow().ToHttpDate();
-    FString isoDatetime = FDateTime::UtcNow().ToFormattedString(TEXT("%Y%m%dT%H%M%S%Z"));
-    FString isoDate = FDateTime::UtcNow().ToFormattedString(TEXT("%Y%m%d"));
-    FString STSPath = FString::Printf(TEXT("%s/us-east-1/s3/aws4_request"), *isoDate);
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: OnComplete - Method: %s, URL: %s"), *fNotifyCompleteVerb, *fNotifyCompleteURL);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: AWS signing data generated - HttpDate: %s, IsoDatetime: %s, IsoDate: %s"), *httpDate, *isoDatetime, *isoDate);
+	// Set some local variables to be used in constructing the S3 API Request
+	TSharedPtr<FJsonObject> uploadLocation = jsonObject->GetObjectField("uploadLocation");
+	FString endpoint = uploadLocation->GetStringField("endpoint");
+	FString bucket = uploadLocation->GetStringField("bucket");
+	FString prefix = uploadLocation->GetStringField("prefix");
+	FString accessKey = uploadLocation->GetStringField("accessKey");
+	FString secretAccessKey = uploadLocation->GetStringField("secretAccessKey");
+	FString sessionToken = uploadLocation->GetStringField("sessionToken");
 
-    // Create the canonical request
-    FString contentHash = UTF8_TO_TCHAR(sha256(fileContent.GetData(), fileContent.Num()).c_str());
-    FString canonicalRequest = FString::Printf(TEXT("PUT\n/%s\n\ndate:%s\nhost:%s.s3.amazonaws.com\nx-amz-content-sha256:%s\nx-amz-security-token:%s\n\ndate;host;x-amz-content-sha256;x-amz-security-token\n%s"), *S3Path, *httpDate, *bucket, *contentHash, *sessionToken);
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: UploadLocation - Endpoint: %s, Bucket: %s, Prefix: %s, AccessKey: %s, SecretAccessKey: %s, SessionToken: %s"), *endpoint, *bucket, *prefix, *accessKey, *secretAccessKey, *sessionToken);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: Canonical request created."));
+	// Ensure the file exists
+	FString filePath = this->fFileName;
+	if (!FPaths::FileExists(filePath))
+	{
+		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::ProvideS3BucketData: File not found: %s"), *filePath);
+		return;
+	}
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: File found at path: %s"), *filePath);
 
-    // Create the String to Sign
-    FString canonicalRequestHash = UTF8_TO_TCHAR(sha256((unsigned char*)TCHAR_TO_UTF8(*canonicalRequest), canonicalRequest.Len()).c_str());
-    FString stringToSign = FString::Printf(TEXT("AWS4-HMAC-SHA256\n%s\n%s\n%s"), *httpDate, *STSPath, *canonicalRequestHash);
+	// Load file content
+	TArray<uint8> fileContent;
+	if (!FFileHelper::LoadFileToArray(fileContent, *filePath))
+	{
+		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::ProvideS3BucketData: Failed to load file: %s"), *filePath);
+		return;
+	}
+	fFileSize = fileContent.Num();
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: File loaded successfully. File size: %d bytes"), fFileSize);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: String to Sign created."));
+	// Get file name and S3 path
+	FString FileName = FPaths::GetCleanFilename(filePath);
+	FString S3Path = FString::Printf(TEXT("%s%s"), *prefix, *FileName);
 
-    // Create the signing key
-    std::string signingKey = hmac_sha256(hmac_sha256(hmac_sha256(hmac_sha256(TCHAR_TO_UTF8(*FString::Printf(TEXT("AWS4%s"), *secretAccessKey)), TCHAR_TO_UTF8(*isoDate)), "us-east-1"), "s3"), "aws4_request");
-    std::string hmacResult = hmac_sha256(signingKey, TCHAR_TO_UTF8(*stringToSign));
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: S3Path generated: %s"), *S3Path);
 
-    FString signature = UTF8_TO_TCHAR(bytesToHexString(reinterpret_cast<const unsigned char*>(hmacResult.c_str()), hmacResult.size()).c_str());
-    FString signedHeaders = "date;host;x-amz-content-sha256;x-amz-security-token";
+	// Generate the S3 URL
+	FString S3Url = FString::Printf(TEXT("https://%s.s3.amazonaws.com/%s"), *bucket, *S3Path);
 
-    UE_LOG(LogTemp, Log, TEXT("LOG_CODE_7018: String to Sign created."));
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: S3 URL generated: %s"), *S3Url);
 
-    // Add the Authorization header
-    FString AuthorizationHeader = FString::Printf(TEXT("AWS4-HMAC-SHA256 Credential=%s/%s,SignedHeaders=%s,Signature=%s"), *accessKey, *STSPath, *signedHeaders, *signature);
-    Request->SetHeader("Date", *httpDate);
-    Request->SetHeader("Authorization", AuthorizationHeader);
-    Request->SetHeader("x-amz-content-sha256", contentHash);
-    Request->SetHeader("x-amz-security-token", sessionToken);
+	// Prepare the PUT request
+	FString contentType = "application/octet-stream";
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: Authorization header set."));
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+	FString url = endpoint + S3Path;
 
-    // Execute the request
-    Request->OnRequestProgress().BindUObject(this, &UCesiumClient::OnS3UploadProgress);
-    Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::NotifyCesiumUploadComplete);
-    Request->ProcessRequest();
+	Request->SetURL(url);
+	Request->SetVerb("PUT");
+	Request->SetHeader("Host", bucket + ".s3.amazonaws.com");
+	Request->SetHeader("Content-Type", contentType);
+	Request->SetContent(fileContent);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: S3 request execution started."));
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: PUT request prepared for S3 upload. URL: %s, Content-Type: %s"), *url, *contentType);
+
+	// AWS Signature Version 4 signing process
+	FString httpDate = FDateTime::UtcNow().ToHttpDate();
+	FString isoDatetime = FDateTime::UtcNow().ToFormattedString(TEXT("%Y%m%dT%H%M%S%Z"));
+	FString isoDate = FDateTime::UtcNow().ToFormattedString(TEXT("%Y%m%d"));
+	FString STSPath = FString::Printf(TEXT("%s/us-east-1/s3/aws4_request"), *isoDate);
+
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: AWS signing data generated - HttpDate: %s, IsoDatetime: %s, IsoDate: %s"), *httpDate, *isoDatetime, *isoDate);
+
+	// Create the canonical request
+	FString contentHash = UTF8_TO_TCHAR(sha256(fileContent.GetData(), fileContent.Num()).c_str());
+	FString canonicalRequest = FString::Printf(TEXT("PUT\n/%s\n\ndate:%s\nhost:%s.s3.amazonaws.com\nx-amz-content-sha256:%s\nx-amz-security-token:%s\n\ndate;host;x-amz-content-sha256;x-amz-security-token\n%s"), *S3Path, *httpDate, *bucket, *contentHash, *sessionToken);
+
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: Canonical request created."));
+
+	// Create the String to Sign
+	FString canonicalRequestHash = UTF8_TO_TCHAR(sha256((unsigned char*)TCHAR_TO_UTF8(*canonicalRequest), canonicalRequest.Len()).c_str());
+	FString stringToSign = FString::Printf(TEXT("AWS4-HMAC-SHA256\n%s\n%s\n%s"), *httpDate, *STSPath, *canonicalRequestHash);
+
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: String to Sign created."));
+
+	// Create the signing key
+	std::string signingKey = hmac_sha256(hmac_sha256(hmac_sha256(hmac_sha256(TCHAR_TO_UTF8(*FString::Printf(TEXT("AWS4%s"), *secretAccessKey)), TCHAR_TO_UTF8(*isoDate)), "us-east-1"), "s3"), "aws4_request");
+	std::string hmacResult = hmac_sha256(signingKey, TCHAR_TO_UTF8(*stringToSign));
+
+	FString signature = UTF8_TO_TCHAR(bytesToHexString(reinterpret_cast<const unsigned char*>(hmacResult.c_str()), hmacResult.size()).c_str());
+	FString signedHeaders = "date;host;x-amz-content-sha256;x-amz-security-token";
+
+	UE_LOG(LogTemp, Log, TEXT("LOG_CODE_7018: String to Sign created."));
+
+	// Add the Authorization header
+	FString AuthorizationHeader = FString::Printf(TEXT("AWS4-HMAC-SHA256 Credential=%s/%s,SignedHeaders=%s,Signature=%s"), *accessKey, *STSPath, *signedHeaders, *signature);
+	Request->SetHeader("Date", *httpDate);
+	Request->SetHeader("Authorization", AuthorizationHeader);
+	Request->SetHeader("x-amz-content-sha256", contentHash);
+	Request->SetHeader("x-amz-security-token", sessionToken);
+
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: Authorization header set."));
+
+	// Execute the request
+	Request->OnRequestProgress().BindUObject(this, &UCesiumClient::OnS3UploadProgress);
+	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::NotifyCesiumUploadComplete);
+	Request->ProcessRequest();
+
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ProvideS3BucketData: S3 request execution started."));
 }
 
 
 void UCesiumClient::NotifyCesiumUploadComplete(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
 {
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::NotifyCesiumUploadComplete: Method called."));
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::NotifyCesiumUploadComplete: Method called."));
 
-    // Validate the response
-    if (!wasSuccessful || !response.IsValid())
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::NotifyCesiumUploadComplete: Failed to upload file to S3. Invalid or unsuccessful response."));
-        return;
-    }
-    else if (response->GetResponseCode() != 200)
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::NotifyCesiumUploadComplete: Failed to upload file to S3. Response code: %d, Content: %s"), response->GetResponseCode(), *response->GetContentAsString());
-        return;
-    }
+	// Validate the response
+	if (!wasSuccessful || !response.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::NotifyCesiumUploadComplete: Failed to upload file to S3. Invalid or unsuccessful response."));
+		return;
+	}
+	else if (response->GetResponseCode() != 200)
+	{
+		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::NotifyCesiumUploadComplete: Failed to upload file to S3. Response code: %d, Content: %s"), response->GetResponseCode(), *response->GetContentAsString());
+		return;
+	}
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::NotifyCesiumUploadComplete: File successfully uploaded to S3."));
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::NotifyCesiumUploadComplete: File successfully uploaded to S3."));
 
-    // Notify Cesium that the upload is complete
-    FHttpModule* Http = &FHttpModule::Get();
-    if (!Http)
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::NotifyCesiumUploadComplete: Failed to retrieve HTTP module for notifying Cesium."));
-        return;
-    }
+	// Create the HTTP request
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+	Request->SetURL(fNotifyCompleteURL);
+	Request->SetVerb(fNotifyCompleteVerb);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::NotifyCesiumUploadComplete: HTTP module successfully retrieved for notifying Cesium."));
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::NotifyCesiumUploadComplete: Notify complete request created. URL: %s, Verb: %s"), *fNotifyCompleteURL, *fNotifyCompleteVerb);
 
-    // Create the HTTP request
-    TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
-    Request->SetURL(fNotifyCompleteURL);
-    Request->SetVerb(fNotifyCompleteVerb);
+	// Set authorization header
+	Request->SetHeader("Authorization", "Bearer " + this->fCesiumToken);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::NotifyCesiumUploadComplete: Notify complete request created. URL: %s, Verb: %s"), *fNotifyCompleteURL, *fNotifyCompleteVerb);
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::NotifyCesiumUploadComplete: Authorization header set. Token: Bearer %s"), *this->fCesiumToken);
 
-    // Set authorization header
-    Request->SetHeader("Authorization", "Bearer " + this->fCesiumToken);
+	// Bind the response callback
+	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::OnCesiumUploadCompletion);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::NotifyCesiumUploadComplete: Authorization header set. Token: Bearer %s"), *this->fCesiumToken);
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::NotifyCesiumUploadComplete: Response callback bound to OnCesiumUploadCompletion."));
 
-    // Bind the response callback
-    Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::OnCesiumUploadCompletion);
-
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::NotifyCesiumUploadComplete: Response callback bound to OnCesiumUploadCompletion."));
-
-    // Execute the request
-    Request->ProcessRequest();
+	// Execute the request
+	Request->ProcessRequest();
 }
 
 
@@ -369,9 +350,6 @@ void UCesiumClient::OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpRespo
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::OnCesiumUploadCompletion: Method called."));
 
-	OnCesiumUploadCompletionResponse.Broadcast();
-	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::OnCesiumUploadCompletion: Cesium upload completion broadcast executed."));
-
 	if (!wasSuccessful || !response.IsValid())
 	{
 		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::OnCesiumUploadCompletion: Failed to notify Cesium. Invalid or unsuccessful response."));
@@ -383,22 +361,14 @@ void UCesiumClient::OnCesiumUploadCompletion(FHttpRequestPtr request, FHttpRespo
 		return;
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::OnCesiumUploadCompletion: Successfully notified Cesium of file upload."));
+	OnCesiumUploadCompletionResponse.Broadcast();
+	UE_LOG(LogTemp, Log, TEXT("Successfully notified Cesium of file upload."));
 }
 
 
 void UCesiumClient::ListAssets(bool retreiveFlag)
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ListAssets: Method called with retrieveFlag: %d."), retreiveFlag);
-
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http)
-	{
-		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::ListAssets: Failed to retrieve HTTP module."));
-		return;
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ListAssets: HTTP module successfully retrieved."));
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 	Request->SetURL("https://api.cesium.com/v1/assets");
@@ -422,6 +392,17 @@ void UCesiumClient::ListResponse(FHttpRequestPtr request, FHttpResponsePtr respo
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::ListResponse: Method called."));
 
+	if (!wasSuccessful || !response.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to list all assets from Cesium."));
+		return;
+	}
+	else if (response->GetResponseCode() != 200)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to list all assets from Cesium. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
+		return;
+	}
+
 	FString data = response->GetContentAsString();
 	UE_LOG(LogTemp, Display, TEXT("INFO: UCesiumClient::ListResponse: HTTP GET response from Cesium: %s"), *data);
 }
@@ -430,15 +411,6 @@ void UCesiumClient::ListResponse(FHttpRequestPtr request, FHttpResponsePtr respo
 void UCesiumClient::RetrieveAllAssets()
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::RetrieveAllAssets: Method called."));
-
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http)
-	{
-		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::RetrieveAllAssets: Failed to retrieve HTTP module."));
-		return;
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::RetrieveAllAssets: HTTP module successfully retrieved."));
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 	Request->SetURL("https://api.cesium.com/v1/assets");
@@ -464,15 +436,6 @@ void UCesiumClient::RetrieveActiveAssets()
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::RetrieveActiveAssets: Method called."));
 
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http)
-	{
-		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::RetrieveActiveAssets: Failed to retrieve HTTP module."));
-		return;
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::RetrieveActiveAssets: HTTP module successfully retrieved."));
-
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
 	Request->SetURL("https://api.cesium.com/v1/assets?search=ACTIVE");
 	Request->SetVerb("GET");
@@ -484,6 +447,7 @@ void UCesiumClient::RetrieveActiveAssets()
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::RetrieveActiveAssets: Authorization header set. Token: Bearer %s"), *fCesiumToken);
 
 	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::StoreActiveAssets);
+	SetRequestTimeout(Request, fRequestTimeoutSeconds);
 
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::RetrieveActiveAssets: Response callback bound to StoreActiveAssets."));
 
@@ -492,122 +456,130 @@ void UCesiumClient::RetrieveActiveAssets()
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::RetrieveActiveAssets: HTTP request successfully executed for retrieving active assets."));
 }
 
+void UCesiumClient::SetRequestTimeout(FHttpRequestPtr Request, float TimeoutInSeconds)
+{
+	// Set a timer to manually handle request timeout (Unreal doesn't natively support it)
+	FTimerHandle TimeoutHandle;
+	GWorld->GetTimerManager().SetTimer(
+		TimeoutHandle,
+		FTimerDelegate::CreateLambda([Request, this]()
+			{
+				if (Request.IsValid() && !Request->GetResponse().IsValid())
+				{
+					UE_LOG(LogTemp, Warning, TEXT("HTTP Request timed out."));
+					Request->CancelRequest();
+					// Broadcast to Abort Level Load Delegate Here
+					NoActiveAssetResponse.Broadcast();
+				}
+			}),
+		TimeoutInSeconds,
+		false
+	);
+}
 
 void UCesiumClient::StoreAllAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
 {
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::StoreAllAssets: Method called."));
+	if (!wasSuccessful || !response.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to retrieve all assets from Cesium."));
+		return;
+	}
+	else if (response->GetResponseCode() != 200)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to retrieve all assets from Cesium. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
+		return;
+	}
 
-    FString data = response->GetContentAsString();
-    UE_LOG(LogTemp, Display, TEXT("INFO: UCesiumClient::StoreAllAssets: HTTP GET response from Cesium: %s"), *data);
+	FString data = response->GetContentAsString();
+	UE_LOG(LogTemp, Display, TEXT("HTTP GET response from Cesium: %s"), *data);
 
-    // Parse the JSON response
-    TSharedRef<TJsonReader<TCHAR>> jsonReader = TJsonReaderFactory<TCHAR>::Create(data);
-    TSharedPtr<FJsonObject> jsonObject;
+	// Parse the JSON response
+	TSharedRef<TJsonReader<TCHAR>> jsonReader = TJsonReaderFactory<TCHAR>::Create(data);
+	TSharedPtr<FJsonObject> jsonObject;
 
-    if (!FJsonSerializer::Deserialize(jsonReader, jsonObject) || !jsonObject.IsValid())
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::StoreAllAssets: Failed to parse JSON from the response."));
-        return;
-    }
+	if (!FJsonSerializer::Deserialize(jsonReader, jsonObject) || !jsonObject.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to parse JSON"));
+		return;
+	}
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::StoreAllAssets: JSON parsing successful, processing assets."));
+	const TArray<TSharedPtr<FJsonValue, ESPMode::ThreadSafe>> items = jsonObject->GetArrayField("items");
 
-    const TArray<TSharedPtr<FJsonValue, ESPMode::ThreadSafe>> items = jsonObject->GetArrayField("items");
-    for (int i = 0; i < items.Num(); i++)
-    {
-        const TSharedPtr<FJsonObject> itemObject = items[i]->AsObject();
-        if (itemObject.IsValid())
-        {
-            UCesiumAsset* lAsset = NewObject<UCesiumAsset>(this);
-            lAsset->AddToRoot(); // GC hack
-            FString lId;
-            FString lName;
-            FString lUploadDate;
-            FString lDataType;
-            FString lDataSize;
-
-            // lDataSize is stored in bytes.
-            if (itemObject->TryGetStringField("id", lId) &&
-                itemObject->TryGetStringField("name", lName) &&
-                itemObject->TryGetStringField("dateAdded", lUploadDate) &&
-                itemObject->TryGetStringField("type", lDataType) &&
-                itemObject->TryGetStringField("bytes", lDataSize))
-            {
-                lAsset->Construct(lId, lName, lUploadDate, lDataType, lDataSize);
-
-                // Skip adding assets to the list if they are components of the digital twin engine.
-                if (fIgnoredAssets.Contains(lName))
-                {
-                    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::StoreAllAssets: Ignoring asset %s since it's part of the ignored assets list."), *lName);
-                    continue;
-                }
-
-                fAllAssetData.Add(lAsset);
-                UE_LOG(LogTemp, Display, TEXT("INFO: UCesiumClient::StoreAllAssets: Stored asset %d of retrieved asset data \n id: %s\n name: %s\n dateAdded: %s\n type: %s\n bytes: %s\n"), 
-                    fAllAssetData.Num(), *lAsset->GetId(), *lAsset->GetItemName(), *lAsset->GetUploadDate(), *lAsset->GetDataType(), *lAsset->GetDataSize());
-            }
-        }
-    }
-
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::StoreAllAssets: Finished processing and storing all assets."));
-
-    RetreiveAllAssetsResponse.Broadcast();
+	// Reset fSpaceUsed to 0 before entering the next for loop if it has already been calculated in this objects lifecycle
+	fSpaceUsed = 0;
+	for (const TSharedPtr<FJsonValue>& item : items)
+	{
+		const TSharedPtr<FJsonObject> itemObject = item->AsObject();
+		if (itemObject.IsValid())
+		{
+			UCesiumAsset* lAsset = NewObject<UCesiumAsset>(this);
+			FString lId, lName, lUploadDate, lDataType, lDataSize;
+			if (itemObject->TryGetStringField("id", lId) &&
+				itemObject->TryGetStringField("name", lName) &&
+				itemObject->TryGetStringField("dateAdded", lUploadDate) &&
+				itemObject->TryGetStringField("type", lDataType) &&
+				itemObject->TryGetStringField("bytes", lDataSize))
+			{
+				AddToSpaceUsed(lDataSize);
+				lAsset->Construct(lId, lName, lUploadDate, lDataType, lDataSize);
+				if (!fIgnoredAssets.Contains(lName))
+				{
+					fAllAssetData.Add(lAsset); // Add the asset to the array
+					UE_LOG(LogTemp, Display, TEXT("Stored asset %d of retrieved asset data \n id: %s\n name: %s\n dateAdded: %s\n type: %s\n bytes: %s\n"), fAllAssetData.Num(), *lAsset->GetId(), *lAsset->GetItemName(), *lAsset->GetUploadDate(), *lAsset->GetDataType(), *lAsset->GetDataSize());
+				}
+			}
+		}
+	}
+	RetreiveAllAssetsResponse.Broadcast();
 }
 
 
 void UCesiumClient::UpdateAssetActiveState(UCesiumAsset* aCesiumAsset)
 {
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: Method called for asset: %s"), *aCesiumAsset->fId);
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: Method called for asset: %s"), *aCesiumAsset->fId);
 
-    FHttpModule* Http = &FHttpModule::Get();
-    if (!Http)
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::UpdateAssetActiveState: Failed to retrieve HTTP module."));
-        return;
-    }
+	if (aCesiumAsset->fId == TEXT(""))
+	{
+		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::UpdateAssetActiveState: Asset ID is empty, cannot proceed with updating state."));
+		return;
+	}
 
-    if (aCesiumAsset->fId == TEXT(""))
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::UpdateAssetActiveState: Asset ID is empty, cannot proceed with updating state."));
-        return;
-    }
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: HTTP module successfully retrieved for updating asset state."));
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: HTTP module successfully retrieved for updating asset state."));
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: Passed in Asset ID: %s"), *aCesiumAsset->fId);
 
-    TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: Passed in Asset ID: %s"), *aCesiumAsset->fId);
+	Request->SetURL("https://api.cesium.com/v1/assets/" + aCesiumAsset->fId);
+	Request->SetVerb("PATCH");
 
-    Request->SetURL("https://api.cesium.com/v1/assets/" + aCesiumAsset->fId);
-    Request->SetVerb("PATCH");
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: HTTP request created. URL: https://api.cesium.com/v1/assets/%s, Verb: PATCH"), *aCesiumAsset->fId);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: HTTP request created. URL: https://api.cesium.com/v1/assets/%s, Verb: PATCH"), *aCesiumAsset->fId);
+	Request->SetHeader("Authorization", "Bearer " + fCesiumToken);
+	Request->SetHeader("Content-Type", "application/json");
 
-    Request->SetHeader("Authorization", "Bearer " + fCesiumToken);
-    Request->SetHeader("Content-Type", "application/json");
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: Headers set. Authorization: Bearer %s, Content-Type: application/json"), *fCesiumToken);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: Headers set. Authorization: Bearer %s, Content-Type: application/json"), *fCesiumToken);
+	TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
 
-    TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
+	aCesiumAsset->ToggleCurrentlyActive();
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: Toggled the active state of the asset. New name: %s"), *aCesiumAsset->GetItemName());
 
-    aCesiumAsset->ToggleCurrentlyActive();
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: Toggled the active state of the asset. New name: %s"), *aCesiumAsset->GetItemName());
+	JsonObject->SetStringField("name", aCesiumAsset->GetItemName());
 
-    JsonObject->SetStringField("name", aCesiumAsset->GetItemName());
+	FString RequestBody;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&RequestBody);
+	FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer);
 
-    FString RequestBody;
-    TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&RequestBody);
-    FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer);
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: JSON payload serialized successfully: %s"), *RequestBody);
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: JSON payload serialized successfully: %s"), *RequestBody);
+	Request->SetContentAsString(RequestBody);
+	Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::LogCesiumResponse);
 
-    Request->SetContentAsString(RequestBody);
-    Request->OnProcessRequestComplete().BindUObject(this, &UCesiumClient::LogCesiumResponse);
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: Response callback bound to LogCesiumResponse."));
 
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: Response callback bound to LogCesiumResponse."));
+	Request->ProcessRequest();
 
-    Request->ProcessRequest();
-
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: HTTP request successfully executed for updating asset state."));
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::UpdateAssetActiveState: HTTP request successfully executed for updating asset state."));
 }
 
 
@@ -640,17 +612,8 @@ void UCesiumClient::DeleteAssetFromCesiumIon(UCesiumAsset* aCesiumAsset)
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::DeleteAssetFromCesiumIon: Method called for asset: %s"), *aCesiumAsset->fId);
 
-	FHttpModule* Http = &FHttpModule::Get();
-	if (!Http)
-	{
-		UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::DeleteAssetFromCesiumIon: Failed to retrieve HTTP module."));
-		return;
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::DeleteAssetFromCesiumIon: HTTP module successfully retrieved."));
-
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = Http->CreateRequest();
-    
+
 	// Log the details of the asset being deleted
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::DeleteAssetFromCesiumIon: Asset to delete:\nID: %s\nName: %s"), *aCesiumAsset->fId, *aCesiumAsset->GetDisplayName());
 
@@ -703,59 +666,63 @@ void UCesiumClient::DeleteAssetResponse(FHttpRequestPtr request, FHttpResponsePt
 
 void UCesiumClient::StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful)
 {
-    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::StoreActiveAssets: Method called."));
+	if (!wasSuccessful || !response.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to retrieve active assets from Cesium."));
+		return;
+	}
+	else if (response->GetResponseCode() != 200)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to  retrieve active assets from Cesium. Response code: %d Content %s"), response->GetResponseCode(), *response->GetContentAsString());
+		return;
+	}
 
-    FString data = response->GetContentAsString();
-    UE_LOG(LogTemp, Display, TEXT("INFO: UCesiumClient::StoreActiveAssets: HTTP GET response from Cesium: %s"), *data);
+	FString data = response->GetContentAsString();
+	UE_LOG(LogTemp, Display, TEXT("HTTP GET response from Cesium: %s"), *data);
 
-    // Parse the JSON response
-    TSharedRef<TJsonReader<TCHAR>> jsonReader = TJsonReaderFactory<TCHAR>::Create(data);
-    TSharedPtr<FJsonObject> jsonObject;
+	// Parse the JSON response
+	TSharedRef<TJsonReader<TCHAR>> jsonReader = TJsonReaderFactory<TCHAR>::Create(data);
+	TSharedPtr<FJsonObject> jsonObject;
 
-    if (!FJsonSerializer::Deserialize(jsonReader, jsonObject) || !jsonObject.IsValid())
-    {
-        UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumClient::StoreActiveAssets: Failed to parse JSON response from Cesium."));
-        return;
-    }
+	if (!FJsonSerializer::Deserialize(jsonReader, jsonObject) || !jsonObject.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to parse JSON"));
+		return;
+	}
 
-    const TArray<TSharedPtr<FJsonValue, ESPMode::ThreadSafe>> items = jsonObject->GetArrayField("items");
-    int lActiveTifIndex = 0;
-    int lActiveLasIndex = 0;
-
-    for (int i = 0; i < items.Num(); i++)
-    {
-        const TSharedPtr<FJsonObject> itemObject = items[i]->AsObject();
-        if (itemObject.IsValid())
-        {
-            FString lOutput;
-            FString lType;
-
-            if (itemObject->TryGetStringField("id", lOutput))
-            {
-                itemObject->TryGetStringField("type", lType);
-
-                if (lType == "IMAGERY")
-                {
-                    fActiveTif.Add(lOutput);
-                    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::StoreActiveAssets: GeoTiff item added with ID: %s"), *fActiveTif[lActiveTifIndex]);
-                    lActiveTifIndex++;
-                }
-                else if (lType == "3DTILES")
-                {
-                    fActiveLas.Add(lOutput);
-                    UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumClient::StoreActiveAssets: LAS item added with ID: %s"), *fActiveLas[lActiveLasIndex]);
-                    lActiveLasIndex++;
-                }
-            }
-            else
-            {
-                UE_LOG(LogTemp, Warning, TEXT("WARNING: UCesiumClient::StoreActiveAssets: Active item no. %d does not contain an 'id' field."), i);
-            }
-        }
-    }
-
-    // Broadcasting the response on completion
-    RetrieveActiveAssetsResponse.Broadcast();
+	const TArray<TSharedPtr<FJsonValue, ESPMode::ThreadSafe>> items = jsonObject->GetArrayField("items");
+	int lActiveTifIndex = 0;
+	int lActiveLasIndex = 0;
+	for (int i = 0; i < items.Num(); i++)
+	{
+		const TSharedPtr<FJsonObject> itemObject = items[i]->AsObject();
+		if (itemObject.IsValid())
+		{
+			FString lOutput;
+			FString lType;
+			if (itemObject->TryGetStringField("id", lOutput))
+			{
+				itemObject->TryGetStringField("type", lType);
+				if (lType == "IMAGERY")
+				{
+					fActiveTif.Add(lOutput);
+					UE_LOG(LogTemp, Log, TEXT("GeoTiff item added with ID: %s"), *fActiveTif[lActiveTifIndex]);
+					lActiveTifIndex++;
+				}
+				else if (lType == "3DTILES")
+				{
+					fActiveLas.Add(lOutput);
+					UE_LOG(LogTemp, Log, TEXT("LAS item added with ID: %s"), *fActiveLas[lActiveLasIndex]);
+					lActiveLasIndex++;
+				}
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Active item no. %d does not contain an 'id' field"), i);
+			}
+		}
+	}
+	RetrieveActiveAssetsResponse.Broadcast();
 }
 
 
@@ -792,4 +759,10 @@ TArray<FString> UCesiumClient::GetActiveTif() { UE_LOG(LogTemp, Log, TEXT("fActi
 TArray<FString> UCesiumClient::GetActiveLas() { UE_LOG(LogTemp, Log, TEXT("fActiveLas Length: %d"), fActiveLas.Num());	return fActiveLas; }
 
 FString UCesiumClient::GetCesiumToken() { return fCesiumToken; }
+
+FString UCesiumClient::GetSpaceAvailableAsString() { return FString::Printf(TEXT(" %.4f GB"), (5 - fSpaceUsed)); }
+void UCesiumClient::AddToSpaceUsed(FString aSize)
+{
+	fSpaceUsed += (FCString::Atof(*aSize) / (1024 * 1024 * 1024));
+}
 

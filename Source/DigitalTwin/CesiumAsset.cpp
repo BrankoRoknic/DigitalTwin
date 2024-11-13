@@ -26,9 +26,10 @@ void UCesiumAsset::Construct(FString aId, FString aItemName, FString aDate, FStr
 	fCurrentlyActive = aItemName.Contains(TEXT("active"), ESearchCase::IgnoreCase);
 	fUploadDate = aDate;
 	fDataType = aDataType;
-	fDataSize = aDataSize;
+	fDataSize = ByteSizeStringToGb(aDataSize);
 
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::Construct: Method completed. DisplayName: %s, CurrentlyActive: %s"), *fDisplayName, fCurrentlyActive ? TEXT("true") : TEXT("false"));
+
 }
 
 
@@ -40,6 +41,10 @@ bool UCesiumAsset::IsActiveDifferent(bool aBool)
 
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::IsActiveDifferent: Result - %s"), result ? TEXT("true") : TEXT("false"));
 	return result;
+}
+
+bool UCesiumAsset::GetCurrentlyActive() {
+	return fCurrentlyActive;
 }
 
 void UCesiumAsset::ToggleCurrentlyActive()
@@ -55,7 +60,7 @@ FString UCesiumAsset::GetId() {
 	return fId;
 }
 
-FString UCesiumAsset::GetItemName() 
+FString UCesiumAsset::GetItemName()
 {
 	FString result = (fCurrentlyActive ? TEXT("ACTIVE") : TEXT("")) + fDisplayName;
 
@@ -71,10 +76,18 @@ FString UCesiumAsset::GetDisplayName() {
 	return fDisplayName;
 }
 
-bool UCesiumAsset::GetCurrentlyActive() {
-	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::GetCurrentlyActive: Method called. CurrentlyActive: %s"), fCurrentlyActive ? TEXT("true") : TEXT("false"));
+FString UCesiumAsset::ByteSizeStringToGb(FString aByteSize)
+{
+	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::ByteSizeStringToGb: Method called. aByteSize: %s"), *aByteSize);
 
-	return fCurrentlyActive;
+	// Convert the FString to double
+	double byteSize = FCString::Atof(*aByteSize);
+
+	// Calculate gigabytes by dividing by 1024^3 (1,073,741,824)
+	double gigabytes = byteSize / (1024.0 * 1024.0 * 1024.0);
+
+	// Convert the result back to FString
+	return FString::Printf(TEXT("%.2f GB"), gigabytes); // Format to 2 decimal places
 }
 
 FString UCesiumAsset::GetUploadDate()
@@ -99,22 +112,22 @@ FString UCesiumAsset::GetUploadDate()
 	return returnValue;
 }
 
-FString UCesiumAsset::GetDataType() { 
+FString UCesiumAsset::GetDataType() {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::GetDataType: Method called. DataType: %s"), *fDataType);
 	return fDataType;
 }
 
-FString UCesiumAsset::GetDataSize() { 
+FString UCesiumAsset::GetDataSize() {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::GetDataSize: Method called. DataSize: %s"), *fDataSize);
 	return fDataSize;
 }
 
-void UCesiumAsset::SetId(FString aValue) { 
+void UCesiumAsset::SetId(FString aValue) {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::SetId: Method called. New ID: %s"), *aValue);
 	fId = aValue;
 }
 
-void UCesiumAsset::SetDisplayName(FString aValue) 
+void UCesiumAsset::SetDisplayName(FString aValue)
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::SetDisplayName: Method called. New DisplayName: %s"), *aValue);
 
@@ -122,28 +135,28 @@ void UCesiumAsset::SetDisplayName(FString aValue)
 }
 
 
-void UCesiumAsset::SetCurrentlyActive(bool aValue) 
+void UCesiumAsset::SetCurrentlyActive(bool aValue)
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::SetCurrentlyActive: Method called. New CurrentlyActive status: %s"), aValue ? TEXT("true") : TEXT("false"));
 
 	fCurrentlyActive = aValue;
 }
 
-void UCesiumAsset::SetUploadDate(FString aValue) 
+void UCesiumAsset::SetUploadDate(FString aValue)
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::SetUploadDate: Method called. New UploadDate: %s"), *aValue);
 
 	fUploadDate = aValue;
 }
 
-void UCesiumAsset::SetDataType(FString aValue) 
+void UCesiumAsset::SetDataType(FString aValue)
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::SetDataType: Method called. New DataType: %s"), *aValue);
 
 	fDataType = aValue;
 }
 
-void UCesiumAsset::SetDataSize(FString aValue) 
+void UCesiumAsset::SetDataSize(FString aValue)
 {
 	UE_LOG(LogTemp, Log, TEXT("INFO: UCesiumAsset::SetDataSize: Method called. New DataSize: %s"), *aValue);
 
@@ -152,7 +165,7 @@ void UCesiumAsset::SetDataSize(FString aValue)
 
 
 void UCesiumAsset::BeginDestroy() {
-	UE_LOG(LogTemp, Error, TEXT("ERROR: UCesiumAsset::BeginDestroy: UCesiumAsset being destroyed. Asset ID: %s"), *fId);
+	UE_LOG(LogTemp, Error, TEXT("CesiumAsset being garbage collected, ID: %s"), *fId);
 
 	Super::BeginDestroy();
 }

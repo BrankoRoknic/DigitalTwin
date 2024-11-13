@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include "Cesium3DTileset.h"
 #include "CesiumGeoreference.h"
 #include "CesiumAsset.h"
@@ -40,19 +43,24 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FDeleteAssetFromCesiumIonResponse);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FUpdateAssetActiveStateResponse);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FNoActiveAssetResponse);
+
 UCLASS(Blueprintable)
 class DIGITALTWIN_API UCesiumClient : public UObject
 {
 	GENERATED_BODY()
 private:
+	const float fRequestTimeoutSeconds = 20.0f;
 	FString fCesiumToken;
 	FString fFileName;
 	FString fNotifyCompleteURL;
 	FString fNotifyCompleteVerb;
+	double fSpaceUsed;
 	TArray<FString> fIgnoredAssets;
 	TArray<FString> fActiveLas;
 	TArray<FString> fActiveTif;
 	int32 fFileSize;
+	FHttpModule* Http;
 public:
 	UPROPERTY()
 	TArray<UCesiumAsset*> fAllAssetData;
@@ -72,7 +80,13 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FUpdateAssetActiveStateResponse UpdateAssetActiveStateResponse;
 
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FNoActiveAssetResponse NoActiveAssetResponse;
+
 	UCesiumClient();
+	// Override BeginDestroy to handle cleanup
+	virtual void BeginDestroy() override;
+
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Create")
 	virtual void UploadFile(FString aFile, FString aName, FString aConversionType, FString aProvidedDataType);
 	void ProvideS3BucketData(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
@@ -86,6 +100,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Retrieve")
 	void RetrieveActiveAssets();
+	void SetRequestTimeout(FHttpRequestPtr Request, float TimeoutInSeconds);
 	void StoreActiveAssets(FHttpRequestPtr request, FHttpResponsePtr response, bool wasSuccessful);
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Retrieve")
@@ -117,4 +132,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
 	FString GetCesiumToken();
+
+	UFUNCTION(BlueprintCallable, Category = "CesiumClient Get Methods")
+	FString GetSpaceAvailableAsString();
+	void AddToSpaceUsed(FString aSize);
 };
